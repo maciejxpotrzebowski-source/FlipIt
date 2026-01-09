@@ -6,6 +6,14 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5489F0602F10635A00AA8947 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54B705362F03FE2F00721E21 /* WidgetKit.framework */; };
+		5489F0612F10635A00AA8947 /* WidgetKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 54B705362F03FE2F00721E21 /* WidgetKit.framework */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5489F0632F10635C00AA8947 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54B705382F03FE2F00721E21 /* SwiftUI.framework */; };
+		5489F0642F10635C00AA8947 /* SwiftUI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 54B705382F03FE2F00721E21 /* SwiftUI.framework */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		54B705462F03FE3100721E21 /* FlipItWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54B705342F03FE2F00721E21 /* FlipItWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		54B704CF2EF9E09A00721E21 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,12 +29,49 @@
 			remoteGlobalIDString = 54B704BC2EF9E09A00721E21;
 			remoteInfo = FlipIt;
 		};
+		54B705442F03FE3100721E21 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 54B704B52EF9E09900721E21 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 54B705332F03FE2F00721E21;
+			remoteInfo = FlipItWidgetExtension;
+		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		5489F0622F10635A00AA8947 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				5489F0642F10635C00AA8947 /* SwiftUI.framework in Embed Frameworks */,
+				5489F0612F10635A00AA8947 /* WidgetKit.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54B7054B2F03FE3100721E21 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 12;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				54B705462F03FE3100721E21 /* FlipItWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		5489F05F2F101AD000AA8947 /* FlipItWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FlipItWidgetExtension.entitlements; sourceTree = "<group>"; };
 		54B704BD2EF9E09A00721E21 /* FlipIt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FlipIt.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		54B704CE2EF9E09A00721E21 /* FlipItTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FlipItTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		54B704D82EF9E09A00721E21 /* FlipItUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FlipItUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		54B705342F03FE2F00721E21 /* FlipItWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FlipItWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		54B705362F03FE2F00721E21 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		54B705382F03FE2F00721E21 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -37,6 +82,21 @@
 			);
 			target = 54B704BC2EF9E09A00721E21 /* FlipIt */;
 		};
+		54B7054A2F03FE3100721E21 /* Exceptions for "FlipItWidget" folder in "FlipItWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 54B705332F03FE2F00721E21 /* FlipItWidgetExtension */;
+		};
+		54B705502F04034200721E21 /* Exceptions for "FlipIt" folder in "FlipItWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				FlipItAppIntents.swift,
+				FlipItModels.swift,
+			);
+			target = 54B705332F03FE2F00721E21 /* FlipItWidgetExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -44,6 +104,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				54B704E02EF9E09A00721E21 /* Exceptions for "FlipIt" folder in "FlipIt" target */,
+				54B705502F04034200721E21 /* Exceptions for "FlipIt" folder in "FlipItWidgetExtension" target */,
 			);
 			path = FlipIt;
 			sourceTree = "<group>";
@@ -56,6 +117,14 @@
 		54B704DB2EF9E09A00721E21 /* FlipItUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = FlipItUITests;
+			sourceTree = "<group>";
+		};
+		54B7053A2F03FE2F00721E21 /* FlipItWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				54B7054A2F03FE3100721E21 /* Exceptions for "FlipItWidget" folder in "FlipItWidgetExtension" target */,
+			);
+			path = FlipItWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -82,15 +151,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		54B705312F03FE2F00721E21 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5489F0632F10635C00AA8947 /* SwiftUI.framework in Frameworks */,
+				5489F0602F10635A00AA8947 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		54B704B42EF9E09900721E21 = {
 			isa = PBXGroup;
 			children = (
+				5489F05F2F101AD000AA8947 /* FlipItWidgetExtension.entitlements */,
 				54B704BF2EF9E09A00721E21 /* FlipIt */,
 				54B704D12EF9E09A00721E21 /* FlipItTests */,
 				54B704DB2EF9E09A00721E21 /* FlipItUITests */,
+				54B7053A2F03FE2F00721E21 /* FlipItWidget */,
+				54B705352F03FE2F00721E21 /* Frameworks */,
 				54B704BE2EF9E09A00721E21 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -101,8 +182,18 @@
 				54B704BD2EF9E09A00721E21 /* FlipIt.app */,
 				54B704CE2EF9E09A00721E21 /* FlipItTests.xctest */,
 				54B704D82EF9E09A00721E21 /* FlipItUITests.xctest */,
+				54B705342F03FE2F00721E21 /* FlipItWidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		54B705352F03FE2F00721E21 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				54B705362F03FE2F00721E21 /* WidgetKit.framework */,
+				54B705382F03FE2F00721E21 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -115,10 +206,12 @@
 				54B704B92EF9E09A00721E21 /* Sources */,
 				54B704BA2EF9E09A00721E21 /* Frameworks */,
 				54B704BB2EF9E09A00721E21 /* Resources */,
+				54B7054B2F03FE3100721E21 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				54B705452F03FE3100721E21 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				54B704BF2EF9E09A00721E21 /* FlipIt */,
@@ -176,6 +269,29 @@
 			productReference = 54B704D82EF9E09A00721E21 /* FlipItUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		54B705332F03FE2F00721E21 /* FlipItWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 54B705472F03FE3100721E21 /* Build configuration list for PBXNativeTarget "FlipItWidgetExtension" */;
+			buildPhases = (
+				54B705302F03FE2F00721E21 /* Sources */,
+				54B705312F03FE2F00721E21 /* Frameworks */,
+				54B705322F03FE2F00721E21 /* Resources */,
+				5489F0622F10635A00AA8947 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				54B7053A2F03FE2F00721E21 /* FlipItWidget */,
+			);
+			name = FlipItWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = FlipItWidgetExtension;
+			productReference = 54B705342F03FE2F00721E21 /* FlipItWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -197,6 +313,9 @@
 						CreatedOnToolsVersion = 26.2;
 						TestTargetID = 54B704BC2EF9E09A00721E21;
 					};
+					54B705332F03FE2F00721E21 = {
+						CreatedOnToolsVersion = 26.2;
+					};
 				};
 			};
 			buildConfigurationList = 54B704B82EF9E09900721E21 /* Build configuration list for PBXProject "FlipIt" */;
@@ -216,6 +335,7 @@
 				54B704BC2EF9E09A00721E21 /* FlipIt */,
 				54B704CD2EF9E09A00721E21 /* FlipItTests */,
 				54B704D72EF9E09A00721E21 /* FlipItUITests */,
+				54B705332F03FE2F00721E21 /* FlipItWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -236,6 +356,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		54B704D62EF9E09A00721E21 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54B705322F03FE2F00721E21 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -266,6 +393,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		54B705302F03FE2F00721E21 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -279,6 +413,11 @@
 			target = 54B704BC2EF9E09A00721E21 /* FlipIt */;
 			targetProxy = 54B704D92EF9E09A00721E21 /* PBXContainerItemProxy */;
 		};
+		54B705452F03FE3100721E21 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 54B705332F03FE2F00721E21 /* FlipItWidgetExtension */;
+			targetProxy = 54B705442F03FE3100721E21 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -287,6 +426,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = FlipIt/FlipIt.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 862K9Z73NB;
@@ -306,13 +447,14 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.maciek.FlipIt;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -323,7 +465,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 26.2;
+				XROS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Debug;
 		};
@@ -332,6 +474,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = FlipIt/FlipIt.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 862K9Z73NB;
@@ -351,13 +495,14 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.maciek.FlipIt;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -368,7 +513,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 26.2;
+				XROS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Release;
 		};
@@ -590,6 +735,79 @@
 			};
 			name = Release;
 		};
+		54B705482F03FE3100721E21 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = FlipItWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 862K9Z73NB;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FlipItWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = FlipItWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.maciek.FlipIt.FlipItWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = xros;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				XROS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		54B705492F03FE3100721E21 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = FlipItWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 862K9Z73NB;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FlipItWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = FlipItWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.maciek.FlipIt.FlipItWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = xros;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+				XROS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -625,6 +843,15 @@
 			buildConfigurations = (
 				54B704EA2EF9E09A00721E21 /* Debug */,
 				54B704EB2EF9E09A00721E21 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		54B705472F03FE3100721E21 /* Build configuration list for PBXNativeTarget "FlipItWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				54B705482F03FE3100721E21 /* Debug */,
+				54B705492F03FE3100721E21 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
