@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import AVFoundation
 
 // --- NOWY UNIWERSALNY WIDOK DODAWANIA KARTY ---
 struct NewDeckSheet: View {
@@ -11,6 +12,8 @@ struct NewDeckSheet: View {
     @State private var frontLabel: String = ""
     @State private var backLabel: String = ""
 
+    @State private var frontLanguage: String = "en-US"
+    @State private var backLanguage: String = "pl-PL"
     // Zmienna sterująca wyświetlaniem alertu
     @State private var showDuplicateAlert = false
 
@@ -21,13 +24,59 @@ struct NewDeckSheet: View {
         NavigationStack {
             Form {
                 Section(header: Text("Deck Info")) {
-                    TextField("Deck Name", text: $name)
-                    TextField("Description (optional)", text: $description)
+                    HStack {
+                                            TextField("Deck Name", text: $name)
+                                                .onChange(of: name) { if name.count > AppLimits.deckName { name = String(name.prefix(AppLimits.deckName)) } }
+                                            Spacer()
+                                            Text("\(name.count)/\(AppLimits.deckName)")
+                                                .font(.caption)
+                                                .foregroundStyle(name.count >= AppLimits.deckName ? .red.opacity(0.8) : .secondary)
+                                        }
+                    HStack(alignment: .top) {
+                                            TextField("Description (optional)", text: $description, axis: .vertical)
+                                                .onChange(of: description) { if description.count > AppLimits.deckDescription { description = String(description.prefix(AppLimits.deckDescription)) } }
+                                            Spacer()
+                                            Text("\(description.count)/\(AppLimits.deckDescription)")
+                                                .font(.caption)
+                                                .foregroundStyle(description.count >= AppLimits.deckDescription ? .red.opacity(0.8) : .secondary)
+                                                .padding(.top, 4)
+                                        }
                 }
-                Section(header: Text("Card Labels")) {
-                    TextField("Front Label (e.g. Word)", text: $frontLabel)
-                    TextField("Back Label (e.g. Definition)", text: $backLabel)
-                }
+                Section(header: Text("Front Side")) {
+                    HStack {
+                                            TextField("Label (e.g. Word)", text: $frontLabel)
+                                                .onChange(of: frontLabel) { if frontLabel.count > AppLimits.label { frontLabel = String(frontLabel.prefix(AppLimits.label)) } }
+                                            Spacer()
+                                            Text("\(frontLabel.count)/\(AppLimits.label)")
+                                                .font(.caption)
+                                                .foregroundStyle(frontLabel.count >= AppLimits.label ? .red.opacity(0.8) : .secondary)
+                                        }
+                                    // Picker przesunięty do lewej, bez etykiety
+                                    Picker("", selection: $frontLanguage) {
+                                        ForEach(availableLanguages.keys.sorted(), id: \.self) { key in
+                                            Text(availableLanguages[key] ?? key).tag(key)
+                                        }
+                                    }
+                                    .labelsHidden() // Ukrywa label "Language"
+                                    .pickerStyle(.menu)
+                                }
+                Section(header: Text("Back Side")) {
+                    HStack {
+                                            TextField("Label (e.g. Definition)", text: $backLabel)
+                                                .onChange(of: backLabel) { if backLabel.count > AppLimits.label { backLabel = String(backLabel.prefix(AppLimits.label)) } }
+                                            Spacer()
+                                            Text("\(backLabel.count)/\(AppLimits.label)")
+                                                .font(.caption)
+                                                .foregroundStyle(backLabel.count >= AppLimits.label ? .red.opacity(0.8) : .secondary)
+                                        }
+                                    Picker("", selection: $backLanguage) {
+                                        ForEach(availableLanguages.keys.sorted(), id: \.self) { key in
+                                            Text(availableLanguages[key] ?? key).tag(key)
+                                        }
+                                    }
+                                    .labelsHidden()
+                                    .pickerStyle(.menu)
+                                }
             }
             .navigationTitle("New Deck")
             .toolbar {
@@ -70,7 +119,7 @@ struct NewDeckSheet: View {
 
     // Właściwa logika tworzenia (wywoływana od razu lub po potwierdzeniu alertu)
     private func createDeck() {
-        store.addDeck(name: name, description: description, frontLabel: frontLabel, backLabel: backLabel)
+        store.addDeck(name: name, description: description, frontLabel: frontLabel, backLabel: backLabel, frontLanguage: frontLanguage, backLanguage: backLanguage)
         if let last = store.decks.last { onDeckCreated?(last.id) }
         dismiss()
     }
@@ -140,10 +189,43 @@ struct AddCardSheet: View {
                     .listRowInsets(EdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 10))
                 }
 
-                Section(header: Text("New card")) {
-                    TextField(selectedDeck?.frontLabel ?? "Front", text: $front)
-                    TextField(selectedDeck?.backLabel ?? "Back", text: $back)
-                }
+                // --- SEKCJA FRONT ---
+                // JEDNA SEKCJA DLA OBU STRON
+                                Section(header:
+                                    HStack {
+                                        Text("New Card")
+                                        Spacer()
+                                        // Wyświetl ostrzeżenie, jeśli Front LUB Back jest za długi
+                                    if front.count > AppLimits.widgetContent || back.count > AppLimits.widgetContent {
+                                            Text("Card may be not displayed on the widget correctly")
+                                                .font(.caption2)
+                                                .foregroundStyle(.orange)
+                                                .textCase(.none)
+                                        }
+                                    }
+                                ) {
+                                    // FRONT
+                                    HStack(alignment: .top) {
+                                        TextField(selectedDeck?.frontLabel ?? "Front", text: $front, axis: .vertical)
+                                            .onChange(of: front) { if front.count > AppLimits.cardContent { front = String(front.prefix(AppLimits.cardContent)) } }
+                                        Spacer()
+                                        Text("\(front.count)/\(AppLimits.cardContent)")
+                                            .font(.caption)
+                                            .padding(.top, 4)
+                                            .foregroundStyle(front.count >= AppLimits.cardContent ? .red.opacity(0.8) : (front.count > 40 ? .orange : .secondary))
+                                    }
+
+                                    // BACK
+                                    HStack(alignment: .top) {
+                                        TextField(selectedDeck?.backLabel ?? "Back", text: $back, axis: .vertical)
+                                            .onChange(of: back) { if back.count > AppLimits.cardContent { back = String(back.prefix(AppLimits.cardContent)) } }
+                                        Spacer()
+                                        Text("\(back.count)/\(AppLimits.cardContent)")
+                                            .font(.caption)
+                                            .padding(.top, 4)
+                                            .foregroundStyle(back.count >= AppLimits.cardContent ? .red.opacity(0.8) : (back.count > 40 ? .orange : .secondary))
+                                    }
+                                }
             }
             .navigationTitle("Add Card")
             .toolbar {
@@ -215,6 +297,95 @@ struct AddCardSheet: View {
             showDuplicateAlert = true
         } else {
             action()
+        }
+    }
+}
+
+struct DeleteDuplicatesSheet: View {
+    @Environment(\.dismiss) var dismiss
+    @ObservedObject var store: FlipItStore
+    var deck: Deck
+
+    // Logika: Szukamy kart, które mają taki sam Front I taki sam Back
+    var duplicatesInfo: (count: Int, ids: Set<UUID>) {
+        var seen = Set<String>()
+        var duplicateIds = Set<UUID>()
+        var bestCards: [String: Flashcard] = [:]
+        var allDuplicateIds = Set<UUID>()
+
+        for card in deck.cards {
+                let f = card.front.trimmingCharacters(in: .whitespaces).lowercased()
+                let b = card.back.trimmingCharacters(in: .whitespaces).lowercased()
+                let key = "\(f)|\(b)"
+
+                if let existingBest = bestCards[key] {
+                    // Znaleźliśmy duplikat. Sprawdzamy, która karta ma większy streak.
+                    if card.streak > existingBest.streak {
+                        // Nowa karta jest lepsza: stara idzie do usunięcia, nową zapamiętujemy
+                        allDuplicateIds.insert(existingBest.id)
+                        bestCards[key] = card
+                    } else {
+                        // Stara karta jest lepsza lub taka sama: nowa idzie do usunięcia
+                        allDuplicateIds.insert(card.id)
+                    }
+                } else {
+                    // Pierwszy raz widzimy tę treść, zapamiętujemy jako potencjalnie najlepszą
+                    bestCards[key] = card
+                }
+            }
+        return (allDuplicateIds.count, allDuplicateIds)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(header: Text("Summary")) {
+                    HStack {
+                        Text("Total cards")
+                        Spacer()
+                        Text("\(deck.cards.count)")
+                            .fontWeight(.bold)
+                    }
+
+                    HStack {
+                        Text("Duplicates found")
+                        Spacer()
+                        Text("\(duplicatesInfo.count)")
+                            .foregroundStyle(duplicatesInfo.count > 0 ? .red : .green)
+                            .fontWeight(.bold)
+                    }
+
+                    if duplicatesInfo.count > 0 {
+                        Text("Duplicates have identical Front and Back sides.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("No exact duplicates found.")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                }
+
+                // USUNĄŁEM DOLNĄ SEKCJĘ Z PRZYCISKIEM
+            }
+            .navigationTitle("Clean Up Deck")
+            .toolbar {
+                // LEWA STRONA (CANCEL)
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+
+                // PRAWA STRONA (DELETE)
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Delete") {
+                        store.deleteCards(deckId: deck.id, cardIds: duplicatesInfo.ids)
+                        dismiss()
+                    }
+                    .foregroundStyle(.red)
+                    .fontWeight(.bold)
+                    .disabled(duplicatesInfo.count == 0)
+                }
+            }
         }
     }
 }
@@ -338,6 +509,7 @@ struct HomeView: View {
     @State private var showImportView = false
     @State private var showManageDecks = false
     @State private var showMoveCardsSheet = false
+    @Environment(\.scenePhase) var scenePhase
     // Kopia zapasowa
     @State private var originalDecks: [Deck] = []
 
@@ -503,6 +675,13 @@ struct HomeView: View {
                             }
                         }
         }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+                    if newPhase == .active {
+                        // Gdy aplikacja staje się aktywna (np. po kliknięciu w widget)
+                        // wymuszamy odświeżenie danych z pliku
+                        store.reloadData()
+                    }
+                }
     }
 }
 
@@ -522,34 +701,84 @@ struct EditDeckSheet: View {
     @State private var frontLabel: String = ""
     @State private var backLabel: String = ""
 
+    @State private var frontLanguage: String = "en-US"
+    @State private var backLanguage: String = "pl-PL"
+
     var body: some View {
         NavigationStack {
             Form {
-                Section(header: Text("Deck Info")) {
-                    // BLOKADA EDYCJI NAZWY
-                    TextField("Deck Name", text: $name, axis: .vertical)
-                        .disabled(isSystemDeck)
-                        .foregroundStyle(isSystemDeck ? .secondary : .primary)
+                            Section(header: Text("Deck Info")) {
+                                HStack {
+                                    TextField("Deck Name", text: $name, axis: .vertical)
+                                        .disabled(isSystemDeck)
+                                        .foregroundStyle(isSystemDeck ? .secondary : .primary)
+                                        .onChange(of: name) { if name.count > AppLimits.deckName { name = String(name.prefix(AppLimits.deckName)) } }
+                                    Spacer()
+                                    Text("\(name.count)/\(AppLimits.deckName)")
+                                        .font(.caption)
+                                        // ZMIANA KOLORU
+                                        .foregroundStyle(name.count >= AppLimits.deckName ? .red.opacity(0.8) : .secondary)
+                                }
 
-                    if isSystemDeck {
-                        Text("You cannot rename the main deck.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
+                                if isSystemDeck {
+                                     Text("You cannot rename the main deck.").font(.caption).foregroundStyle(.secondary)
+                                }
 
-                    TextField("Description", text: $description, axis: .vertical)
-                }
-                Section(header: Text("Card Labels")) {
-                    TextField("Front Label", text: $frontLabel, axis: .vertical)
-                    TextField("Back Label", text: $backLabel, axis: .vertical)
-                }
-            }
+                                HStack(alignment: .top) {
+                                    TextField("Description", text: $description, axis: .vertical)
+                                        .onChange(of: description) { if description.count > AppLimits.deckDescription { description = String(description.prefix(AppLimits.deckDescription)) } }
+                                    Spacer()
+                                    Text("\(description.count)/\(AppLimits.deckDescription)")
+                                        .font(.caption)
+                                        // ZMIANA KOLORU
+                                        .foregroundStyle(description.count >= AppLimits.deckDescription ? .red.opacity(0.8) : .secondary)
+                                        .padding(.top, 4)
+                                }
+                            }
+
+                            Section(header: Text("Front Side")) {
+                                HStack {
+                                    TextField("Label", text: $frontLabel)
+                                        .onChange(of: frontLabel) { if frontLabel.count > AppLimits.label { frontLabel = String(frontLabel.prefix(AppLimits.label)) } }
+                                    Spacer()
+                                    Text("\(frontLabel.count)/\(AppLimits.label)")
+                                        .font(.caption)
+                                        // ZMIANA KOLORU
+                                        .foregroundStyle(frontLabel.count >= AppLimits.label ? .red.opacity(0.8) : .secondary)
+                                }
+                                Picker("", selection: $frontLanguage) {
+                                    ForEach(availableLanguages.keys.sorted(), id: \.self) { key in
+                                        Text(availableLanguages[key] ?? key).tag(key)
+                                    }
+                                }
+                                .labelsHidden().pickerStyle(.menu)
+                            }
+
+                            Section(header: Text("Back Side")) {
+                                HStack {
+                                    TextField("Label", text: $backLabel)
+                                        .onChange(of: backLabel) { if backLabel.count > AppLimits.label { backLabel = String(backLabel.prefix(AppLimits.label)) } }
+                                    Spacer()
+                                    Text("\(backLabel.count)/\(AppLimits.label)")
+                                        .font(.caption)
+                                        // ZMIANA KOLORU
+                                        .foregroundStyle(backLabel.count >= AppLimits.label ? .red.opacity(0.8) : .secondary)
+                                }
+                                Picker("", selection: $backLanguage) {
+                                    ForEach(availableLanguages.keys.sorted(), id: \.self) { key in
+                                        Text(availableLanguages[key] ?? key).tag(key)
+                                    }
+                                }
+                                .labelsHidden().pickerStyle(.menu)
+                            }
+                        }
             .navigationTitle("Edit Deck")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        store.updateDeck(deckId: deckId, name: name, description: description, frontLabel: frontLabel, backLabel: backLabel)
+                        store.updateDeck(deckId: deckId, name: name, description: description, frontLabel: frontLabel, backLabel: backLabel,frontLanguage: frontLanguage,backLanguage: backLanguage)
                         dismiss()
                     }
                     .disabled(name.isEmpty)
@@ -561,10 +790,56 @@ struct EditDeckSheet: View {
                     description = deck.description
                     frontLabel = deck.frontLabel
                     backLabel = deck.backLabel
+                    frontLanguage = deck.frontLanguage
+                    backLanguage = deck.backLanguage
                 }
             }
         }
     }
+}
+
+struct SpeakerButton: View {
+    var text: String
+    var language: String
+
+    @State private var synthesizer = AVSpeechSynthesizer()
+
+    var body: some View {
+        Button(action: {
+            speak()
+        }) {
+            Image(systemName: "speaker.wave.2.circle.fill")
+                .font(.system(size: 32)) // Duży, wyraźny przycisk
+                .foregroundStyle(.blue.opacity(0.8))
+                .background(.white)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func speak() {
+        if synthesizer.isSpeaking {
+            synthesizer.stopSpeaking(at: .immediate)
+        }
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = AVSpeechSynthesisVoice(language: language)
+        utterance.rate = 0.5
+        synthesizer.speak(utterance)
+    }
+}
+
+let availableLanguages: [String: String] = [
+    "en-US": "English (US)",
+    "en-GB": "English (UK)",
+    "pl-PL": "Polish",
+    "de-DE": "German",
+    "es-ES": "Spanish",
+    "fr-FR": "French",
+    "it-IT": "Italian"
+]
+
+func getLangCode(_ code: String) -> String {
+    return String(code.prefix(2)).uppercased()
 }
 
 // --- 2. DECK PREVIEW & EDIT ---
@@ -626,9 +901,42 @@ struct CardRowView: View {
         .sheet(isPresented: $showEditSheet) {
             NavigationStack {
                 Form {
-                    TextField(deck.frontLabel, text: $tempFront)
-                    TextField(deck.backLabel, text: $tempBack)
-                }
+                                    Section(header:
+                                        HStack {
+                                            Text("Card Content")
+                                            Spacer()
+                                            // Sprawdzamy oba pola naraz
+                                        if tempFront.count > AppLimits.widgetContent || tempBack.count > AppLimits.widgetContent {
+                                                Text("Card may be not displayed on the widget correctly")
+                                                    .font(.caption2)
+                                                    .foregroundStyle(.orange)
+                                                    .textCase(.none)
+                                            }
+                                        }
+                                    ) {
+                                        // FRONT
+                                        HStack(alignment: .top) {
+                                            TextField(deck.frontLabel, text: $tempFront, axis: .vertical)
+                                                .onChange(of: tempFront) { if tempFront.count > AppLimits.cardContent { tempFront = String(tempFront.prefix(AppLimits.cardContent)) } }
+                                            Spacer()
+                                            Text("\(tempFront.count)/\(AppLimits.cardContent)")
+                                                .font(.caption)
+                                                .padding(.top, 4)
+                                                .foregroundStyle(tempFront.count >= AppLimits.cardContent ? .red.opacity(0.8) : (tempFront.count > 40 ? .orange : .secondary))
+                                        }
+
+                                        // BACK
+                                        HStack(alignment: .top) {
+                                            TextField(deck.backLabel, text: $tempBack, axis: .vertical)
+                                                .onChange(of: tempBack) { if tempBack.count > AppLimits.cardContent { tempBack = String(tempBack.prefix(AppLimits.cardContent)) } }
+                                            Spacer()
+                                            Text("\(tempBack.count)/\(AppLimits.cardContent)")
+                                                .font(.caption)
+                                                .padding(.top, 4)
+                                                .foregroundStyle(tempBack.count >= AppLimits.cardContent ? .red.opacity(0.8) : (tempBack.count > 40 ? .orange : .secondary))
+                                        }
+                                    }
+                                }
                 .navigationTitle("Edit Card")
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showEditSheet = false } }
@@ -678,6 +986,7 @@ struct DeckDetailView: View {
     @State private var showDeleteDeckAlert = false
     @State private var showMoveCardsFromSheet = false
     @State private var showMoveCardsToSheet = false
+    @State private var showDeleteDuplicates = false
 
     var activeDeck: Deck? {
         store.decks.first(where: { $0.id == selectedDeckId })
@@ -710,18 +1019,22 @@ struct DeckDetailView: View {
                             }.padding(.vertical, 2)
                         }
                         HStack {
-                            VStack(alignment: .leading) {
-                                Text("Front Label").font(.caption).foregroundStyle(.secondary)
-                                Text(deck.frontLabel).fontWeight(.medium)
-                            }
-                            Spacer()
-                            Divider()
-                            Spacer()
-                            VStack(alignment: .trailing) {
-                                Text("Back Label").font(.caption).foregroundStyle(.secondary)
-                                Text(deck.backLabel).fontWeight(.medium)
-                            }
-                        }.padding(.vertical, 2)
+                                                    VStack(alignment: .leading) {
+                                                        Text("Front Label").font(.caption).foregroundStyle(.secondary)
+                                                        // Wyświetlamy np. "Słówko (EN)"
+                                                        Text("\(deck.frontLabel) (\(getLangCode(deck.frontLanguage)))")
+                                                            .fontWeight(.medium)
+                                                    }
+                                                    Spacer()
+                                                    Divider()
+                                                    Spacer()
+                                                    VStack(alignment: .trailing) {
+                                                        Text("Back Label").font(.caption).foregroundStyle(.secondary)
+                                                        // Wyświetlamy np. "Definicja (PL)"
+                                                        Text("\(deck.backLabel) (\(getLangCode(deck.backLanguage)))")
+                                                            .fontWeight(.medium)
+                                                    }
+                                                }.padding(.vertical, 2)
                     }
 
                     // Sekcja Kart
@@ -769,7 +1082,13 @@ struct DeckDetailView: View {
                     HStack(spacing: 16) {
                         Menu {
                             Button(action: { showEditDeck = true }) { Label("Edit Deck", systemImage: "pencil") }
+                            Button(action: { showDeleteDuplicates = true }) {
+                                                            Label("Delete Duplicates", systemImage: "doc.on.doc")
+                                                        }
                             if store.decks.firstIndex(where: { $0.id == activeDeck?.id }) != 0 {
+
+
+                                Divider()
                                     Button(role: .destructive, action: { showDeleteDeckAlert = true }) {
                                         Label("Delete Deck", systemImage: "trash")
                                     }
@@ -813,6 +1132,12 @@ struct DeckDetailView: View {
                             .presentationDetents([.large])
                     }
                 }
+        .sheet(isPresented: $showDeleteDuplicates) {
+                    if let deck = activeDeck {
+                        DeleteDuplicatesSheet(store: store, deck: deck)
+                            .presentationDetents([.large])
+                    }
+                }
         .alert("Delete Deck", isPresented: $showDeleteDeckAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -839,6 +1164,7 @@ struct DeckDetailView: View {
         }
     }
 }
+
 struct SettingsView: View {
     @ObservedObject var store: FlipItStore
     @Environment(\.dismiss) var dismiss
@@ -1097,13 +1423,28 @@ struct StudySessionView: View {
                     let startText = isFrontFirst ? item.card.front : item.card.back
                     let endText = isFrontFirst ? item.card.back : item.card.front
 
-                    ZStack {
-                        CardView(text: endText, backgroundColor: .white)
-                            .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-                            .opacity(isFlipped ? 1 : 0)
-                        CardView(text: startText, backgroundColor: .white)
-                            .opacity(isFlipped ? 0 : 1)
-                    }
+                    let currentDeck = store.decks.first(where: { $0.id == item.deckId })
+                                        let frontLang = currentDeck?.frontLanguage ?? "en-US"
+                                        let backLang = currentDeck?.backLanguage ?? "pl-PL"
+                                        let frontLbl = currentDeck?.frontLabel ?? "Front"
+                                        let backLbl = currentDeck?.backLabel ?? "Back"
+
+                                        let startLabel = isFrontFirst ? frontLbl : backLbl
+                                        let endLabel = isFrontFirst ? backLbl : frontLbl
+
+                                        let startLang = isFrontFirst ? frontLang : backLang
+                                        let endLang = isFrontFirst ? backLang : frontLang
+
+                                        ZStack {
+                                            // TYŁ KARTY (po obrocie)
+                                            CardView(text: endText, label: endLabel, language: endLang, backgroundColor: .white)
+                                                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                                                .opacity(isFlipped ? 1 : 0)
+
+                                            // PRZÓD KARTY
+                                            CardView(text: startText, label: startLabel, language: startLang, backgroundColor: .white)
+                                                .opacity(isFlipped ? 0 : 1)
+                                        }
                     .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
 
                     RoundedRectangle(cornerRadius: 20)
@@ -1264,23 +1605,45 @@ struct StudySessionView: View {
 
 struct CardView: View {
     var text: String
+    var label: String      // Np. "Słówko" lub "Definicja"
+    var language: String   // Kod języka dla głośnika
     var backgroundColor: Color
-    
+    var displayLabel: String {
+            "\(label) (\(getLangCode(language)))"
+        }
+
     var body: some View {
         ZStack {
-            // Tło karty
             RoundedRectangle(cornerRadius: 20)
                 .fill(backgroundColor)
                 .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-            
-            // Tekst na karcie
-            Text(text)
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .multilineTextAlignment(.center)
-                .padding()
-                .foregroundStyle(.black) // <--- ZMIANA: Wymuszamy czarny kolor tekstu
-                .minimumScaleFactor(0.5) // Zmniejszy tekst, jeśli jest za długi
+
+            VStack(spacing: 0) {
+                // 1. LABEL NA GÓRZE (małymi literami)
+                Text(displayLabel)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .textCase(.uppercase)
+                    .foregroundStyle(.gray)
+                    .padding(.top, 32)
+
+                Spacer()
+
+                // 2. GŁÓWNA TREŚĆ
+                Text(text)
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                    .foregroundStyle(.black)
+                    .minimumScaleFactor(0.5)
+
+                Spacer()
+                // 3. GŁOŚNIK (pod słowem)
+                SpeakerButton(text: text, language: language)
+                    .padding(.bottom, 64)
+                //Spacer()
+            }
         }
         .frame(height: 400)
     }
@@ -1463,7 +1826,18 @@ struct MoveCardsView: View {
                     }
 
                     // --- 2. SOURCE DECK ---
-                    Section(header: Text("Source Deck")) {
+                    Section(header:
+                                HStack {
+                        Text("Source Deck")
+                        // Komunikat pojawia się tutaj
+                        if destDeckId == sourceDeckId {
+                            Spacer()
+                            Text("Same as Destination")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .textCase(.none)
+                        }
+                    }) {
                         HStack(alignment: .center) {
                             Menu {
                                 Picker("Source", selection: $sourceDeckId) {
@@ -1558,9 +1932,12 @@ struct MoveCardsView: View {
                                     .padding(.trailing, 8)
 
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(destDeck?.frontLabel ?? "Front")
+                                    Text("\(destDeck?.frontLabel ?? "Front") (\(getLangCode(destDeck?.frontLanguage ?? "")))")
                                         .font(.system(size: 16, weight: .semibold)).foregroundStyle(.primary)
-                                    Text(swapFaces ? (sourceDeck?.backLabel ?? "Back") : (sourceDeck?.frontLabel ?? "Front"))
+                                    let srcLabel = swapFaces ? (sourceDeck?.backLabel ?? "Back") : (sourceDeck?.frontLabel ?? "Front")
+                                    let srcCode = getLangCode(swapFaces ? (sourceDeck?.backLanguage ?? "") : (sourceDeck?.frontLanguage ?? ""))
+
+                                    Text("\(srcLabel) (\(srcCode))")
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1568,9 +1945,12 @@ struct MoveCardsView: View {
                                 Divider().frame(height: 32).padding(.horizontal, 10)
 
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(destDeck?.backLabel ?? "Back")
+                                    Text("\(destDeck?.backLabel ?? "Back") (\(getLangCode(destDeck?.backLanguage ?? "")))")
                                         .font(.system(size: 16, weight: .semibold)).foregroundStyle(.primary)
-                                    Text(swapFaces ? (sourceDeck?.frontLabel ?? "Front") : (sourceDeck?.backLabel ?? "Back"))
+                                    let srcLabel2 = swapFaces ? (sourceDeck?.frontLabel ?? "Front") : (sourceDeck?.backLabel ?? "Back")
+                                    let srcCode2 = getLangCode(swapFaces ? (sourceDeck?.frontLanguage ?? "") : (sourceDeck?.backLanguage ?? ""))
+
+                                    Text("\(srcLabel2) (\(srcCode2))")
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1644,7 +2024,7 @@ struct MoveCardsView: View {
                             dismiss()
                         }
                     }
-                    .disabled(selectedCardIds.isEmpty || sourceDeckId == nil || destDeckId == nil || sourceDeckId == destDeckId)
+                    .disabled(selectedCardIds.isEmpty || sourceDeckId == nil || destDeckId == nil)
                     .fontWeight(.bold)
                 }
             }
@@ -1662,14 +2042,17 @@ struct ImportView: View {
 
     @State private var selectedDeckId: UUID?
     @State private var swapFaces = false
+    @State private var skipDuplicates = true
     @State private var showFileImporter = false
     @State private var showNewDeckSheet = false
     @State private var rawFileCards: [Flashcard] = []
     @State private var importedFileName: String? = nil
 
+    // 1. POPRAWIONY INIT (Domyślnie wybiera pierwszy deck)
     init(store: FlipItStore, initialDeckId: UUID? = nil) {
         self.store = store
-        self._selectedDeckId = State(initialValue: initialDeckId)
+        let defaultSelection = initialDeckId ?? store.decks.first?.id
+        self._selectedDeckId = State(initialValue: defaultSelection)
     }
 
     var selectedDeck: Deck? {
@@ -1681,35 +2064,56 @@ struct ImportView: View {
         selectedDeck?.name ?? "Select Deck"
     }
 
-    var cardsToImport: [Flashcard] {
-        let preparedCards = swapFaces
-            ? rawFileCards.map { Flashcard(front: $0.back, back: $0.front) }
-            : rawFileCards
-        guard let deck = selectedDeck else { return preparedCards }
-        return preparedCards.filter { newCard in
-            !deck.cards.contains { existingCard in
-                existingCard.front.localizedCaseInsensitiveCompare(newCard.front) == .orderedSame &&
-                existingCard.back.localizedCaseInsensitiveCompare(newCard.back) == .orderedSame
-            }
+    // Logika przetwarzania
+    var processedFileCards: [Flashcard] {
+        if swapFaces {
+            return rawFileCards.map { Flashcard(front: $0.back, back: $0.front) }
+        } else {
+            return rawFileCards
         }
     }
 
+    func isDuplicate(_ card: Flashcard) -> Bool {
+            guard let deck = selectedDeck else { return false }
+            return deck.cards.contains { existingCard in
+                // 1. Przygotowanie tekstów (trimowanie spacji)
+                let existingFront = existingCard.front.trimmingCharacters(in: .whitespaces)
+                let existingBack = existingCard.back.trimmingCharacters(in: .whitespaces)
+
+                let newFront = card.front.trimmingCharacters(in: .whitespaces)
+                let newBack = card.back.trimmingCharacters(in: .whitespaces)
+
+                // 2. Porównanie (case-insensitive) OBU stron jednocześnie (AND)
+                return existingFront.localizedCaseInsensitiveCompare(newFront) == .orderedSame &&
+                       existingBack.localizedCaseInsensitiveCompare(newBack) == .orderedSame
+            }
+        }
+
     var duplicatesCount: Int {
-        return rawFileCards.count - cardsToImport.count
+        return processedFileCards.filter { isDuplicate($0) }.count
+    }
+
+    var finalCardsToImport: [Flashcard] {
+        if skipDuplicates {
+            return processedFileCards.filter { !isDuplicate($0) }
+        } else {
+            return processedFileCards
+        }
     }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) { // Zmieniamy Form na VStack
+            VStack(spacing: 0) {
 
-                // --- GÓRNE USTAWIENIA (Jako lista o stałym rozmiarze) ---
+                // --- GÓRNE USTAWIENIA (LISTA) ---
                 List {
+                    // SEKCJA 1: DOCELOWY DECK
                     Section(header: Text("Destination Deck")) {
                         HStack(alignment: .center) {
                             Menu {
                                 Picker("Deck", selection: $selectedDeckId) {
                                     ForEach(store.decks) { deck in
-                                        Text(deck.name).tag(deck.id)
+                                        Text(deck.name).tag(Optional(deck.id))
                                     }
                                 }
                             } label: {
@@ -1740,6 +2144,7 @@ struct ImportView: View {
                         .listRowInsets(EdgeInsets(top: 0, leading: 10, bottom: 0, trailing: 10))
                     }
 
+                    // SEKCJA 2: ŹRÓDŁO I OPCJE
                     Section(header: Text("Source")) {
                         Button(action: { showFileImporter = true }) {
                             HStack {
@@ -1756,46 +2161,45 @@ struct ImportView: View {
                             }
                         }
                         Toggle("Swap Columns", isOn: $swapFaces)
+                        Toggle("Skip Duplicates", isOn: $skipDuplicates)
+                            .tint(.orange)
                     }
 
+                    // SEKCJA 3: NAGŁÓWEK PREVIEW ZE STATYSTYKAMI (TO ZNIKNĘŁO, A TERAZ JEST)
                     Section(header:
                         HStack {
                             Text("Preview")
-                                // System automatycznie formatuje nagłówek,
-                                // ale upewniamy się co do wielkości liter przycisku
-
                             Spacer()
-
-                        if !rawFileCards.isEmpty {
-                                    // Mała tabela statystyk po prawej stronie
-                                    VStack(alignment: .trailing, spacing: 2) {
-
-                                        HStack(spacing: 8) {
-                                            Text("In file: \(rawFileCards.count)")
-                                            if duplicatesCount > 0 {
-                                                Text("Duplicates: \(duplicatesCount)")
-                                                    .foregroundStyle(.orange)
-                                            }
-                                            Text("To import: \(cardsToImport.count)")
-                                                .foregroundStyle(.green)
-                                                .fontWeight(.bold)
+                            // Wyświetlamy statystyki tylko jeśli wczytano plik
+                            if !rawFileCards.isEmpty {
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    HStack(spacing: 8) {
+                                        Text("In file: \(rawFileCards.count)")
+                                        if duplicatesCount > 0 {
+                                            Text("Duplicates: \(duplicatesCount)")
+                                                .foregroundStyle(.orange)
                                         }
-                                        .font(.system(size: 10))
+                                        Text("To import: \(finalCardsToImport.count)")
+                                            .foregroundStyle(.green)
+                                            .fontWeight(.bold)
                                     }
-                                    .padding(.trailing, 4)
+                                    .font(.system(size: 10))
                                 }
+                                .padding(.trailing, 4)
+                            }
                         }
                     ) {
+                        // Pusta sekcja, służy tylko do wyświetlenia nagłówka w stylu Listy
                     }
-
                 }
                 .listStyle(.insetGrouped)
-                .frame(height: 312) // Ograniczamy wysokość sekcji ustawień
+                .frame(height: 360) // Dopasowana wysokość, żeby zmieściły się opcje i nagłówek
                 .scrollDisabled(true)
 
+                // --- DOLNA CZĘŚĆ: PODGLĄD LISTY ---
                 VStack(alignment: .leading, spacing: 0) {
 
-                    if cardsToImport.isEmpty {
+                    if processedFileCards.isEmpty {
                         VStack {
                             Spacer()
                             ContentUnavailableView("No cards to display", systemImage: "doc.text.magnifyingglass", description: Text("Select a file to see preview"))
@@ -1806,22 +2210,25 @@ struct ImportView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .padding(.horizontal, 16)
                     } else {
-                        // Tabela podglądu zachowująca się jak List w HomeView
                         VStack(spacing: 0) {
-                            // Nagłówek tabeli
+
+                            // NAGŁÓWKI KOLUMN Z JĘZYKAMI
                             HStack {
-                                Text(selectedDeck?.frontLabel ?? "Front")
+                                Text("\(selectedDeck?.frontLabel ?? "Front") (\(getLangCode(selectedDeck?.frontLanguage ?? "")))")
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                 Divider().frame(height: 24).padding(.horizontal, 10)
-                                Text(selectedDeck?.backLabel ?? "Back")
+                                Text("\(selectedDeck?.backLabel ?? "Back") (\(getLangCode(selectedDeck?.backLanguage ?? "")))")
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .font(.system(size: 16, design: .default))
                             .padding(.vertical, 8)
                             .padding(.horizontal, 16)
 
+                            // LISTA KART
                             List {
-                                ForEach(cardsToImport) { card in
+                                ForEach(processedFileCards) { card in
+                                    let isDup = isDuplicate(card)
+
                                     HStack(alignment: .center) {
                                         Text(card.front)
                                             .lineLimit(1)
@@ -1833,10 +2240,12 @@ struct ImportView: View {
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                     .font(.system(size: 12, design: .monospaced))
+                                    // Pomarańczowy dla duplikatów
+                                    .foregroundStyle(isDup ? .orange : .primary)
                                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                                 }
                             }
-                            .listStyle(.plain) // Czysty wygląd bez marginesów Formy
+                            .listStyle(.plain)
                             .environment(\.defaultMinListRowHeight, 30)
                         }
                         .background(Color(uiColor: .secondarySystemGroupedBackground))
@@ -1857,12 +2266,14 @@ struct ImportView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Import") {
                         if let targetId = selectedDeckId {
-                            store.saveImportedCards(cardsToImport, to: targetId)
+                            // Importujemy tylko to co przeszło filtr
+                            store.saveImportedCards(finalCardsToImport, to: targetId)
                             dismiss()
                         }
                     }
                     .fontWeight(.bold)
-                    .disabled(selectedDeckId == nil || cardsToImport.isEmpty)
+                    // Blokada jeśli brak decku lub brak kart do importu
+                    .disabled(selectedDeckId == nil || finalCardsToImport.isEmpty)
                 }
             }
             .background(Color(uiColor: .systemGroupedBackground))
@@ -1878,7 +2289,6 @@ struct ImportView: View {
                 switch result {
                     case .success(let urls):
                         if let url = urls.first {
-                            // Pobieramy nazwę pliku z URL
                             self.importedFileName = url.lastPathComponent
                             self.rawFileCards = store.loadCardsFromURL(url)
                         }

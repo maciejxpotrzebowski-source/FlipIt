@@ -12,5 +12,6 @@ import SwiftUI
 struct FlipItWidgetBundle: WidgetBundle {
     var body: some Widget {
         FlipItWidget()
+        FlipItMinimalWidget()
     }
 }

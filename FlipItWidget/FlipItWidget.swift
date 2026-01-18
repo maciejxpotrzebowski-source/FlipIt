@@ -7,222 +7,358 @@ import WidgetKit
 import SwiftUI
 import AppIntents
 
+
 struct SimpleEntry: TimelineEntry {
     let date: Date
     let card: Flashcard
     let isFlipped: Bool // Dodajemy stan widoku do Entry
+    let frontLabel: String
+    let backLabel: String
+    let frontLang: String
+    let backLang: String
+    let useColorfulButtons: Bool
+    let inactivityLevel: Int
 }
 
 struct Provider: AppIntentTimelineProvider {
     typealias Intent = EmptyWidgetConfigurationIntent
 
-    func placeholder(in context: Context) -> SimpleEntry {
-        SimpleEntry(date: Date(), card: Flashcard(front: "Apple", back: "Jabłko"), isFlipped: false)
-    }
+    func placeholderEntry() -> SimpleEntry {
+            SimpleEntry(
+                date: Date(),
+                card: Flashcard(front: "Apple", back: "Jabłko"),
+                isFlipped: false,
+                frontLabel: "Front", backLabel: "Back",
+                frontLang: "en-US", backLang: "pl-PL",
+                useColorfulButtons: true,
+                inactivityLevel: 0
+            )
+        }
+    func placeholder(in context: Context) -> SimpleEntry { placeholderEntry() }
 
-    func snapshot(for configuration: Intent, in context: Context) async -> SimpleEntry {
-        SimpleEntry(date: Date(), card: Flashcard(front: "Apple", back: "Jabłko"), isFlipped: false)
-    }
+    func snapshot(for configuration: Intent, in context: Context) async -> SimpleEntry { placeholderEntry() }
 
     func timeline(for configuration: Intent, in context: Context) async -> Timeline<SimpleEntry> {
-        let entry = await MainActor.run {
-            let store = FlipItStore()
-            let settings = store.settings
+            let entry = await MainActor.run {
+                let store = FlipItStore()
+                let settings = store.settings
+                var inactivityLvl = 0
+                if settings.widgetInactivityColor {
+                                let days = Calendar.current.dateComponents([.day], from: settings.lastWidgetInteractionDate, to: Date()).day ?? 0
+                                if days >= 3 { inactivityLvl = 3 }
+                                else if days == 2 { inactivityLvl = 2 }
+                                else if days == 1 { inactivityLvl = 1 }
+                            }
+                let useColors = settings.widgetColorfulButtons
 
-            // 1. Przygotuj pulę kart zgodnie z ustawieniami
-            let activeDecks = store.decks.filter { settings.usedDeckIDs.contains($0.id) }
-            var candidateCards = activeDecks.flatMap { $0.cards }
+                let activeDecks = store.decks.filter { settings.usedDeckIDs.contains($0.id) }
 
-            if settings.onlyUnlearned {
-                candidateCards = candidateCards.filter { !$0.isLearned }
-            }
+                var candidates: [(card: Flashcard, deck: Deck)] = []
 
-            if candidateCards.isEmpty {
-                // Fallback, gdy brak kart
-                let msg = store.decks.isEmpty ? "Add Decks" : "All Learned!"
-                return SimpleEntry(date: Date(), card: Flashcard(front: msg, back: "Check App"), isFlipped: false)
-            }
-
-            // 2. SPRAWDZAMY STAN ZAPISANY PRZEZ "FLIP CARD INTENT"
-            let savedState = store.loadWidgetState()
-
-            // Zmienne na wynik
-            var finalCard: Flashcard
-            var finalIsFlipped: Bool
-
-            // CZY MAMY ZAPISANĄ KARTĘ I CZY ONA NADAL ISTNIEJE W PULI?
-            if let state = savedState,
-               let foundCard = candidateCards.first(where: { $0.id == state.currentCardId }) {
-
-                // TAK -> Użytkownik kliknął FLIP. Pokazujemy TĘ SAMĄ kartę.
-                finalCard = foundCard
-                finalIsFlipped = state.isFlipped
-
-            } else {
-                // NIE -> Użytkownik kliknął MARK (state usunięty) lub to start. LOSUJEMY NOWĄ.
-
-                // Algorytm losowania (ważony)
-                let factor = settings.learningFactorValue
-                let weightedItems = candidateCards.map { card -> (card: Flashcard, weight: Double) in
-                    (card, 1.0 / (1.0 + (Double(card.streak) * factor)))
-                }
-                let totalWeight = weightedItems.reduce(0) { $0 + $1.weight }
-                let randomVal = Double.random(in: 0..<totalWeight)
-                var cursor = 0.0
-                finalCard = candidateCards.first!
-
-                for item in weightedItems {
-                    cursor += item.weight
-                    if cursor >= randomVal {
-                        finalCard = item.card
-                        break
+                for deck in activeDecks {
+                    for card in deck.cards {
+                        // Filtracja: tylko nieumiane (jeśli włączona opcja)
+                        if settings.onlyUnlearned && card.isLearned { continue }
+                        candidates.append((card, deck))
                     }
                 }
 
-                // Ustal stronę początkową (dla nowej karty)
-                switch settings.studySide {
-                case .front: finalIsFlipped = false
-                case .back: finalIsFlipped = true
-                case .random: finalIsFlipped = Bool.random()
+                // Domyślne wartości (gdy brak kart)
+                var finalCard = Flashcard(front: "Add Decks", back: "Check App")
+                // Domyślne etykiety i języki, gdyby nic nie znaleziono
+                var fLabel = "Front"; var bLabel = "Back"
+                var fLang = "en-US"; var bLang = "pl-PL"
+
+                if !candidates.isEmpty {
+                     finalCard = Flashcard(front: "All Learned!", back: "Great job!")
+                }
+                var finalIsFlipped = false
+
+                // 2. LOGIKA WYBORU KARTY (korzystamy z candidates)
+                if !candidates.isEmpty {
+                    let savedState = store.loadWidgetState()
+
+                    // Szukamy w naszej liście par (karta + deck)
+                    if let state = savedState,
+                       let foundPair = candidates.first(where: { $0.card.id == state.currentCardId }) {
+
+                        // A. ZNALEZIONO ZAPISANĄ KARTĘ
+                        finalCard = foundPair.card
+                        finalIsFlipped = state.isFlipped
+
+                        // Pobieramy dane z decka BEZPOŚREDNIO z pary
+                        fLabel = foundPair.deck.frontLabel
+                        bLabel = foundPair.deck.backLabel
+                        fLang = foundPair.deck.frontLanguage
+                        bLang = foundPair.deck.backLanguage
+
+                    } else {
+                        // B. LOSOWANIE NOWEJ
+                        let factor = settings.learningFactorValue
+
+                        // Ważenie na podstawie streaka karty
+                        let weightedItems = candidates.map { pair -> (item: (card: Flashcard, deck: Deck), weight: Double) in
+                            (pair, 1.0 / (1.0 + (Double(pair.card.streak) * factor)))
+                        }
+
+                        let totalWeight = weightedItems.reduce(0) { $0 + $1.weight }
+                        let randomVal = Double.random(in: 0..<totalWeight)
+                        var cursor = 0.0
+
+                        // Fallback na pierwszy element
+                        var selectedPair = candidates.first!
+
+                        for element in weightedItems {
+                            cursor += element.weight
+                            if cursor >= randomVal {
+                                selectedPair = element.item
+                                break
+                            }
+                        }
+
+                        finalCard = selectedPair.card
+
+                        // Pobieramy dane z decka BEZPOŚREDNIO z wylosowanej pary
+                        fLabel = selectedPair.deck.frontLabel
+                        bLabel = selectedPair.deck.backLabel
+                        fLang = selectedPair.deck.frontLanguage
+                        bLang = selectedPair.deck.backLanguage
+
+                        // Ustalanie strony startowej
+                        switch settings.studySide {
+                        case .front: finalIsFlipped = false
+                        case .back: finalIsFlipped = true
+                        case .random: finalIsFlipped = Bool.random()
+                        }
+
+                        store.saveWidgetState(cardId: finalCard.id, isFlipped: finalIsFlipped)
+                    }
                 }
 
-                // ZAPISUJEMY NOWĄ KARTĘ DO STANU
-                // Żeby kolejne kliknięcie "Flip" wiedziało, co obracać.
-                store.saveWidgetState(cardId: finalCard.id, isFlipped: finalIsFlipped)
+                // 3. TWORZENIE ENTRY (Nie musimy już szukać decka w store.decks)
+                return SimpleEntry(
+                    date: Date(),
+                    card: finalCard,
+                    isFlipped: finalIsFlipped,
+                    frontLabel: fLabel,
+                    backLabel: bLabel,
+                    frontLang: fLang,
+                    backLang: bLang,
+                    useColorfulButtons: useColors,
+                    inactivityLevel: inactivityLvl
+                )
             }
 
-            return SimpleEntry(date: Date(), card: finalCard, isFlipped: finalIsFlipped)
+            return Timeline(entries: [entry], policy: .never)
         }
+}
 
-        return Timeline(entries: [entry], policy: .never)
+extension View {
+    // Helper do koloru tła na podstawie poziomu z Entry
+    func entryBackgroundColor(level: Int) -> Color {
+        switch level {
+            case 5: return Color.red.opacity(1.0)
+            case 4: return Color.red.opacity(0.75)
+            case 3: return Color.red.opacity(0.5)
+            case 2: return Color.red.opacity(0.25)
+            case 1: return Color.red.opacity(0.1)
+            default: return Color(uiColor: .secondarySystemGroupedBackground)
+        }
     }
 }
+
 // ... (EmptyWidgetConfigurationIntent bez zmian) ...
 struct EmptyWidgetConfigurationIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Configuration"
     static var description: LocalizedStringResource = "FlipIt Widget Configuration"
 }
 
+// --- NOWY WIDOK DLA DRUGIEGO WIDGETU ---
 struct FlipItWidgetEntryView : View {
     var entry: Provider.Entry
 
-    // Obliczamy kolor tła na podstawie bezczynności
-    var backgroundColor: Color {
-        // Musimy pobrać ustawienia ze sklepu (można by je przekazywać w Entry, ale tu odczytamy bezpośrednio)
-        // W prawdziwej produkcji lepiej przekazać settings w SimpleEntry.
-        // Tutaj dla uproszczenia zrobimy szybki odczyt, bo to View.
-        // UWAGA: View w Widgetcie jest statyczne, więc lepiej by było mieć to w Entry.
-        // Zróbmy to "po bożemu": Pobierzemy to w Providerze i przekażemy w Entry,
-        // ale żeby nie zmieniać definicji Entry (SimpleEntry),
-        // zrobimy tutaj "szybki hack" - odczytamy settings z UserDefaults bezpośrednio.
-
-        let defaults = UserDefaults(suiteName: "group.com.maciek.FlipIt")
-        if let data = defaults?.data(forKey: "AppSettings"),
-           let settings = try? JSONDecoder().decode(AppSettings.self, from: data) {
-
-            if !settings.widgetInactivityColor {
-                return Color(uiColor: .secondarySystemGroupedBackground)
-            }
-
-            // Obliczamy różnicę dni
-            let calendar = Calendar.current
-            // Używamy .day, żeby liczył dni kalendarzowe, nie pełne 24h
-            let days = calendar.dateComponents([.day], from: settings.lastWidgetInteractionDate, to: Date()).day ?? 0
-
-            if days >= 3 { return Color.red.opacity(0.4) } // Mocno czerwony
-            if days == 2 { return Color.red.opacity(0.2) } // Średnio
-            if days == 1 { return Color.red.opacity(0.08) } // Lekko
-        }
-
-        return Color(uiColor: .secondarySystemGroupedBackground)
-    }
-
-    // Sprawdzamy czy przyciski mają być kolorowe
-    var useColorfulButtons: Bool {
-        let defaults = UserDefaults(suiteName: "group.com.maciek.FlipIt")
-        if let data = defaults?.data(forKey: "AppSettings"),
-           let settings = try? JSONDecoder().decode(AppSettings.self, from: data) {
-            return settings.widgetColorfulButtons
-        }
-        return true
-    }
+    // Helpery (takie same jak w pierwszym widgecie)
+    func getLangCode(_ code: String) -> String { String(code.prefix(2)).uppercased() }
+    var currentText: String { entry.isFlipped ? entry.card.back : entry.card.front }
+    var currentLabel: String { entry.isFlipped ? entry.backLabel : entry.frontLabel }
+    var currentLang: String { entry.isFlipped ? entry.backLang : entry.frontLang }
 
     var body: some View {
         VStack(spacing: 0) {
-
-            // --- 1. OBSZAR KARTY ---
-            Link(destination: URL(string: "flipit://add_card")!) {
+            // 1. KARTA (Pozostawiamy możliwość obracania dotknięciem samej karty)
+            Button(intent: FlipCardIntent(cardID: entry.card.id, flipState: !entry.isFlipped)) {
                 ZStack {
-                    // Warstwa A: Informacja
+                    RoundedRectangle(cornerRadius: 12).fill(entryBackgroundColor(level: entry.inactivityLevel))
                     VStack {
-                        Text("Tap to add new card")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary.opacity(0.7))
-                            .padding(.top, 8)
+                        Text("\(currentLabel) (\(getLangCode(currentLang)))")
+                            .font(.system(size: 10, weight: .semibold))
+                            .textCase(.uppercase)
+                            .foregroundStyle(.secondary.opacity(0.8))
+                            .padding(.top, 10)
                         Spacer()
+                        Text(currentText)
+                            .font(.system(size: 16, weight: .semibold))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 8)
+                            .foregroundStyle(Color.primary)
+                            .id(entry.card.id.uuidString + (entry.isFlipped ? "_back" : "_front"))
+                            .minimumScaleFactor(0.8)
+                        Spacer()
+                        Spacer().frame(height: 10)
                     }
-
-                    // Warstwa B: Treść
-                    Text(entry.isFlipped ? entry.card.back : entry.card.front)
-                        .font(.system(size: 16, weight: .semibold))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 8)
-                        .foregroundStyle(Color.primary)
-                        .id(entry.card.id.uuidString + (entry.isFlipped ? "_back" : "_front"))
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                // TU APLIKUJEMY LOGIKĘ KOLORU TŁA
-                .background(backgroundColor)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .buttonStyle(.plain)
             .padding(10)
 
-            // --- 2. PASEK PRZYCISKÓW ---
-            HStack(spacing: 20) {
-                // Przycisk X
+            // 2. PASEK PRZYCISKÓW (Tu jest ZMIANA)
+            HStack(spacing: 8) {
+                // Lewy: X
                 Button(intent: MarkCardIntent(cardID: entry.card.id, isKnown: false)) {
                     Image(systemName: "xmark.circle.fill")
                         .resizable()
                         .frame(width: 34, height: 34)
-                        // Logika koloru przycisków
-                        .foregroundStyle(useColorfulButtons ? .red : .gray)
+                        .foregroundStyle(entry.useColorfulButtons ? .red : .gray)
                 }
                 .buttonStyle(.plain)
 
-                // Przycisk FLIP
-                Button(intent: FlipCardIntent(cardID: entry.card.id, flipState: !entry.isFlipped)) {
-                     Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                // ŚRODKOWY: LINK DO DODAWANIA (Zamiast Flip)
+                Link(destination: URL(string: "flipit://add_card")!) {
+                    Image(systemName: "plus.circle.fill")
                         .resizable()
                         .frame(width: 34, height: 34)
-                        .foregroundStyle(useColorfulButtons ? .blue : .gray)
+                        .foregroundStyle(entry.useColorfulButtons ? .blue : .gray)
                 }
-                .buttonStyle(.plain)
 
-                // Przycisk V
+                // Prawy: V
                 Button(intent: MarkCardIntent(cardID: entry.card.id, isKnown: true)) {
                     Image(systemName: "checkmark.circle.fill")
                         .resizable()
                         .frame(width: 34, height: 34)
-                        .foregroundStyle(useColorfulButtons ? .green : .gray)
+                        .foregroundStyle(entry.useColorfulButtons ? .green : .gray)
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.bottom, 12)
+            .padding(.horizontal, 10)
+            .padding(.bottom, 10)
         }
         .containerBackground(Color(uiColor: .systemGroupedBackground), for: .widget)
     }
 }
 
+// --- KONFIGURACJA NOWEGO WIDGETU ---
 struct FlipItWidget: Widget {
-    let kind: String = "FlipItWidget"
+    let kind: String = "FlipItWidget" // Unikalne ID
 
     var body: some WidgetConfiguration {
+        // Używamy tego samego Providera, ale innego widoku (EntryView)
         AppIntentConfiguration(kind: kind, intent: EmptyWidgetConfigurationIntent.self, provider: Provider()) { entry in
             FlipItWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("FlipIt Study")
-        .description("Study your cards directly from the home screen.")
-        .supportedFamilies([.systemSmall, .systemMedium])
-        .contentMarginsDisabled() // Opcjonalnie, dla lepszego wyglądu
+        .configurationDisplayName("Study & Add")
+        .description("Study cards and quickly add new ones.")
+        .supportedFamilies([.systemSmall])
+        .contentMarginsDisabled()
     }
 }
+
+
+// --- WIDOK DLA WIDGETU MINIMALISTYCZNEGO (X i V) ---
+struct FlipItMinimalWidgetEntryView : View {
+    var entry: Provider.Entry
+
+    // Helpery
+    func getLangCode(_ code: String) -> String { String(code.prefix(2)).uppercased() }
+    var currentText: String { entry.isFlipped ? entry.card.back : entry.card.front }
+    var currentLabel: String { entry.isFlipped ? entry.backLabel : entry.frontLabel }
+    var currentLang: String { entry.isFlipped ? entry.backLang : entry.frontLang }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 1. KARTA (Obracanie dotknięciem)
+            Button(intent: FlipCardIntent(cardID: entry.card.id, flipState: !entry.isFlipped)) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12).fill(entryBackgroundColor(level: entry.inactivityLevel))
+                    VStack {
+                        Text("\(currentLabel) (\(getLangCode(currentLang)))")
+                            .font(.system(size: 10, weight: .semibold))
+                            .textCase(.uppercase)
+                            .foregroundStyle(.secondary.opacity(0.8))
+                            .padding(.top, 10)
+                        Spacer()
+                        Text(currentText)
+                            .font(.system(size: 16, weight: .semibold))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 8)
+                            .foregroundStyle(Color.primary)
+                            .id(entry.card.id.uuidString + (entry.isFlipped ? "_back" : "_front"))
+                            .minimumScaleFactor(0.8)
+                        Spacer()
+                        Spacer().frame(height: 10)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(10)
+
+            // 2. PASEK PRZYCISKÓW (TYLKO X i V)
+            HStack {
+                // Lewy: X
+                Button(intent: MarkCardIntent(cardID: entry.card.id, isKnown: false)) {
+                    ZStack {
+                                // 1. TŁO (Wydłużone koło)
+                                Capsule()
+                                    .fill(entry.useColorfulButtons ? .red : .gray)
+                                    .frame(width: 60, height: 34)
+                                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1) // Opcjonalny cień
+
+                                // 2. IKONA (Biała w środku)
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 16, weight: .bold)) // Pogrubiona, mniejsza ikona
+                                    .foregroundStyle(.background)
+                            }
+                }
+                .buttonStyle(.plain)
+
+                // Odstęp między przyciskami
+                Spacer()
+
+                // Prawy: V
+                Button(intent: MarkCardIntent(cardID: entry.card.id, isKnown: true)) {
+                    ZStack {
+                                // 1. TŁO (Wydłużone koło)
+                                Capsule()
+                                    .fill(entry.useColorfulButtons ? .green : .gray)
+                                    .frame(width: 60, height: 34)
+                                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1) // Opcjonalny cień
+
+                                // 2. IKONA (Biała w środku)
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 16, weight: .bold)) // Pogrubiona, mniejsza ikona
+                                    .foregroundStyle(.background)
+                            }
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 10) // Margines, żeby przyciski nie były przy samych krawędziach
+            .padding(.bottom, 10)
+        }
+        .containerBackground(Color(uiColor: .systemGroupedBackground), for: .widget)
+    }
+}
+
+// --- KONFIGURACJA WIDGETU MINIMAL ---
+struct FlipItMinimalWidget: Widget {
+    let kind: String = "FlipItMinimalWidget"
+
+    var body: some WidgetConfiguration {
+        AppIntentConfiguration(kind: kind, intent: EmptyWidgetConfigurationIntent.self, provider: Provider()) { entry in
+            FlipItMinimalWidgetEntryView(entry: entry)
+        }
+        .configurationDisplayName("FlipIt Minimal")
+        .description("Clean look with just Mark buttons.")
+        .supportedFamilies([.systemSmall])
+        .contentMarginsDisabled()
+    }
+}
+

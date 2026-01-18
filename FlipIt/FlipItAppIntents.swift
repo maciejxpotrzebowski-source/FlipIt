@@ -1,6 +1,7 @@
 import AppIntents
 import WidgetKit
 import SwiftUI
+import AVFoundation
 
 // --- INTENT OZNACZANIA KARTY (X lub V) ---
 struct MarkCardIntent: AppIntent {
@@ -64,6 +65,30 @@ struct FlipCardIntent: AppIntent {
             // Tu wystarczy reload, bo bumpWidgetInteraction() zapisał już datę w Settings
             WidgetCenter.shared.reloadAllTimelines()
         }
+        return .result()
+    }
+}
+
+struct SpeakCardIntent: AppIntent {
+    static var title: LocalizedStringResource = "Speak Card"
+    static var openAppWhenRun: Bool = true // Wymagane, aby dźwięk zadziałał pewnie
+
+    @Parameter(title: "Text") var text: String
+    @Parameter(title: "Language") var language: String
+
+    init() {}
+    init(text: String, language: String) {
+        self.text = text
+        self.language = language
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        let synthesizer = AVSpeechSynthesizer()
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = AVSpeechSynthesisVoice(language: language)
+        utterance.rate = 0.5
+        synthesizer.speak(utterance)
         return .result()
     }
 }

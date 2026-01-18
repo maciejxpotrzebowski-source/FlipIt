@@ -7,6 +7,13 @@ import WidgetKit
 // --- STAŁA GRUPY ---
 let APP_GROUP_ID = "group.com.maciek.FlipIt"
 
+struct AppLimits {
+    static let deckName = 40
+    static let deckDescription = 300
+    static let label = 30
+    static let cardContent = 400
+    static let widgetContent = 40
+}
 // --- DATA MODELS ---
 
 struct Flashcard: Identifiable, Codable, Equatable {
@@ -61,6 +68,11 @@ struct Deck: Identifiable, Codable, Equatable {
     var description: String = ""
     var frontLabel: String = "Front"
     var backLabel: String = "Back"
+
+    // NOWE POLA JĘZYKOWE (Dodane)
+    var frontLanguage: String = "en-US"
+    var backLanguage: String = "pl-PL"
+
     var cards: [Flashcard]
 
     var progress: Double {
@@ -69,15 +81,19 @@ struct Deck: Identifiable, Codable, Equatable {
         return Double(learnedCount) / Double(cards.count)
     }
 
-    init(id: UUID = UUID(), name: String, description: String = "", frontLabel: String = "Front", backLabel: String = "Back", cards: [Flashcard]) {
+    // Zaktualizowany inicjalizator
+    init(id: UUID = UUID(), name: String, description: String = "", frontLabel: String = "Front", backLabel: String = "Back", frontLanguage: String = "en-US", backLanguage: String = "pl-PL", cards: [Flashcard]) {
         self.id = id
         self.name = name
         self.description = description
         self.frontLabel = frontLabel
         self.backLabel = backLabel
+        self.frontLanguage = frontLanguage
+        self.backLanguage = backLanguage
         self.cards = cards
     }
 
+    // Zaktualizowane dekodowanie (dla kompatybilności wstecznej)
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
@@ -86,9 +102,12 @@ struct Deck: Identifiable, Codable, Equatable {
         description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
         frontLabel = try container.decodeIfPresent(String.self, forKey: .frontLabel) ?? "Front"
         backLabel = try container.decodeIfPresent(String.self, forKey: .backLabel) ?? "Back"
+
+        // Dekodowanie z wartością domyślną dla starszych danych
+        frontLanguage = try container.decodeIfPresent(String.self, forKey: .frontLanguage) ?? "en-US"
+        backLanguage = try container.decodeIfPresent(String.self, forKey: .backLanguage) ?? "pl-PL"
     }
 }
-
 enum CardSortOption: String, Codable, CaseIterable {
     case frontAZ = "Front (A-Z)"
     case frontZA = "Front (Z-A)"
@@ -140,6 +159,15 @@ class FlipItStore: ObservableObject {
             ]))
             saveData()
         }
+        NotificationCenter.default.addObserver(
+                forName: UIApplication.willEnterForegroundNotification,
+                object: nil,
+                queue: .main // Wymuszamy kolejkę główną dla NotificationCenter
+            ) { _ in
+                Task { @MainActor in
+                    self.reloadData()
+                }
+            }
     }
 
     // MARK: - Persistence
@@ -218,19 +246,35 @@ class FlipItStore: ObservableObject {
                     decks[dIndex].cards[cIndex].streak = 0
                 }
                 decks[dIndex].cards[cIndex].isLearned = (decks[dIndex].cards[cIndex].streak > 0)
+                saveData()
+                break
             }
         }
     }
 
     // --- ACTIONS (CRUD) ---
 
-    func addDeck(name: String, description: String, frontLabel: String, backLabel: String) {
-        let finalFront = frontLabel.isEmpty ? "Front" : frontLabel
-        let finalBack = backLabel.isEmpty ? "Back" : backLabel
-        let newDeck = Deck(name: name, description: description, frontLabel: finalFront, backLabel: finalBack, cards: [])
-        decks.append(newDeck)
-        saveData()
-    }
+    func addDeck(name: String, description: String, frontLabel: String, backLabel: String, frontLanguage: String, backLanguage: String) {
+            let finalFront = frontLabel.isEmpty ? "Front" : frontLabel
+            let finalBack = backLabel.isEmpty ? "Back" : backLabel
+
+            // Tworzymy deck z językami
+            let newDeck = Deck(
+                name: name,
+                description: description,
+                frontLabel: finalFront,
+                backLabel: finalBack,
+                frontLanguage: frontLanguage,
+                backLanguage: backLanguage, // Przekazujemy języki
+                cards: []
+            )
+        if decks.isEmpty {
+                decks.append(newDeck)
+            } else {
+                decks.insert(newDeck, at: 1)
+            }
+            saveData()
+        }
 
     func deleteDeck(at offsets: IndexSet) {
             if offsets.contains(0) { return }
@@ -253,19 +297,22 @@ class FlipItStore: ObservableObject {
         }
     }
 
-    func updateDeck(deckId: UUID, name: String, description: String, frontLabel: String, backLabel: String) {
-        if let index = decks.firstIndex(where: { $0.id == deckId }) {
-            var finalName = name
-                        if index == 0 {
-                            finalName = decks[index].name // Przywracamy starą nazwę
-                        }
-            decks[index].name = finalName
-            decks[index].description = description
-            decks[index].frontLabel = frontLabel
-            decks[index].backLabel = backLabel
-            saveData()
+    func updateDeck(deckId: UUID, name: String, description: String, frontLabel: String, backLabel: String, frontLanguage: String, backLanguage: String) {
+            if let index = decks.firstIndex(where: { $0.id == deckId }) {
+                var finalName = name
+                if index == 0 {
+                    finalName = decks[index].name
+                }
+                decks[index].name = finalName
+                decks[index].description = description
+                decks[index].frontLabel = frontLabel
+                decks[index].backLabel = backLabel
+                // Aktualizacja języków
+                decks[index].frontLanguage = frontLanguage
+                decks[index].backLanguage = backLanguage
+                saveData()
+            }
         }
-    }
 
     func deleteDeck(id: UUID) {
             if let index = decks.firstIndex(where: { $0.id == id }) {
@@ -352,36 +399,78 @@ class FlipItStore: ObservableObject {
     // --- IMPORT LOGIC ---
 
     func loadCardsFromURL(_ url: URL) -> [Flashcard] {
-        let accessing = url.startAccessingSecurityScopedResource()
-        defer {
-            if accessing { url.stopAccessingSecurityScopedResource() }
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if accessing { url.stopAccessingSecurityScopedResource() }
+            }
+
+            do {
+                let data = try Data(contentsOf: url)
+                var loadedCards: [Flashcard] = []
+
+                if url.pathExtension.lowercased() == "json" {
+                    loadedCards = try parseJSON(data: data)
+                } else {
+                    if let content = decodeText(from: data) {
+                        loadedCards = parseCSV(content: content)
+                    }
+                }
+
+                // UŻYCIE GLOBALNEGO LIMITU
+                let limit = AppLimits.cardContent
+
+                let processedCards = loadedCards.map { card -> Flashcard in
+                    var newFront = card.front
+                    var newBack = card.back
+
+                    if newFront.count > limit {
+                        newFront = String(newFront.prefix(limit)) + "..."
+                    }
+                    if newBack.count > limit {
+                        newBack = String(newBack.prefix(limit)) + "..."
+                    }
+                    return Flashcard(front: newFront, back: newBack)
+                }
+
+                var uniqueCards: [Flashcard] = []
+                var seen = Set<String>()
+                for card in processedCards {
+                    let key = "\(card.front.trimmingCharacters(in: .whitespaces).lowercased())|\(card.back.trimmingCharacters(in: .whitespaces).lowercased())"
+                    if !seen.contains(key) {
+                        seen.insert(key)
+                        uniqueCards.append(card)
+                    }
+                }
+                return uniqueCards
+            } catch {
+                print("Import load error: \(error.localizedDescription)")
+                return []
+            }
         }
 
-        do {
-            let data = try Data(contentsOf: url)
-            var loadedCards: [Flashcard] = []
-
-            if url.pathExtension.lowercased() == "json" {
-                loadedCards = try parseJSON(data: data)
-            } else {
-                if let content = decodeText(from: data) {
-                    loadedCards = parseCSV(content: content)
-                }
+    func deleteCards(deckId: UUID, cardIds: Set<UUID>) {
+            if let dIndex = decks.firstIndex(where: { $0.id == deckId }) {
+                // Usuwamy wszystkie karty, których ID znajduje się w zestawie cardIds
+                decks[dIndex].cards.removeAll { cardIds.contains($0.id) }
+                saveData()
             }
+        }
 
-            var uniqueCards: [Flashcard] = []
-            var seen = Set<String>()
-            for card in loadedCards {
-                let key = "\(card.front.trimmingCharacters(in: .whitespaces).lowercased())|\(card.back.trimmingCharacters(in: .whitespaces).lowercased())"
-                if !seen.contains(key) {
-                    seen.insert(key)
-                    uniqueCards.append(card)
-                }
+    func reloadData() {
+        let url = getDocumentsDirectory().appendingPathComponent(fileName)
+
+        // 1. Ładowanie talii i kart
+        if let data = try? Data(contentsOf: url) {
+            if let decoded = try? JSONDecoder().decode([Deck].self, from: data) {
+                // Musimy to zrobić na głównym wątku, aby UI zareagowało
+                self.decks = decoded
             }
-            return uniqueCards
-        } catch {
-            print("Import load error: \(error.localizedDescription)")
-            return []
+        }
+
+        // 2. Ładowanie ustawień (tu są dane o postępie z widgetu)
+        if let settingsData = UserDefaults(suiteName: APP_GROUP_ID)?.data(forKey: "AppSettings"),
+           let decodedSettings = try? JSONDecoder().decode(AppSettings.self, from: settingsData) {
+            self.settings = decodedSettings
         }
     }
 
