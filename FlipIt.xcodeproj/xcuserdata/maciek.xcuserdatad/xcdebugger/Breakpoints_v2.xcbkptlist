@@ -14,10 +14,10 @@
             filePath = "FlipIt/FlipItViews.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1652"
-            endingLineNumber = "1652"
-            landmarkName = "body"
-            landmarkType = "24">
+            startingLineNumber = "1666"
+            endingLineNumber = "1666"
+            landmarkName = "ImportDestinationSheet"
+            landmarkType = "14">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -46,10 +46,10 @@
             filePath = "FlipIt/FlipItViews.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1215"
-            endingLineNumber = "1215"
-            landmarkName = "areAllSelected"
-            landmarkType = "24">
+            startingLineNumber = "1229"
+            endingLineNumber = "1229"
+            landmarkName = "StudySetupView"
+            landmarkType = "14">
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

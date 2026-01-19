@@ -490,7 +490,7 @@ class FlipItStore: ObservableObject {
         return try JSONDecoder().decode([Flashcard].self, from: data)
     }
 
-    private func parseCSV(content: String) -> [Flashcard] {
+    func parseCSV(content: String) -> [Flashcard] {
         var cards: [Flashcard] = []
         let normalizedContent = content
             .replacingOccurrences(of: "\r\n", with: "\n")
