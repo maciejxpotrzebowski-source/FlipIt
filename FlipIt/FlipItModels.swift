@@ -14,7 +14,29 @@ struct AppLimits {
     static let cardContent = 400
     static let widgetContent = 40
 }
+
+enum AppLanguage: String, Codable, CaseIterable {
+    case english = "en"
+    case polish = "pl"
+
+    var displayName: String {
+        switch self {
+        case .english: return "English"
+        case .polish: return "Polski"
+        }
+    }
+}
 // --- DATA MODELS ---
+struct AnimationConfig {
+    // Szybkość obracania karty (im mniejsza liczba, tym szybciej)
+    static let flipDuration: Double = 0.4//czas potrzebny do odwrócenia karty, kiedy się na nią naciśnie.
+
+    // Opóźnienie po przesunięciu karty, zanim pojawi się następna (tzw. czas na "oddech")
+    static let nextCardDelay: Double = 0.2//opoznienie przed pojawieniem się nowej karty
+
+    // Szybkość wlatywania nowej karty od dołu
+    static let flyInDuration: Double = 0.5//czas potrzebny na pojawienie sie nowej karty po przeswipowaniu wczesniejszej
+}
 
 struct Flashcard: Identifiable, Codable, Equatable {
     var id = UUID()
@@ -138,6 +160,10 @@ struct AppSettings: Codable {
     var widgetColorfulButtons: Bool = true
     var widgetInactivityColor: Bool = true
     var lastWidgetInteractionDate: Date = Date() // Data ostatniego kliknięcia
+    var appLanguage: AppLanguage = .english
+        // Domyślne języki dla nowych talii (np. użytkownik uczy się głównie Hiszpańskiego)
+        var defaultFrontLanguage: String = "en-US"
+        var defaultBackLanguage: String = "pl-PL"
 }
 
 // --- VIEW MODEL (STORE) ---
@@ -178,6 +204,30 @@ class FlipItStore: ObservableObject {
         }
         print("CRITICAL: App Group not found. Using local documents.")
         return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    }
+
+    func deleteAllCards(deckId: UUID) {
+        if let index = decks.firstIndex(where: { $0.id == deckId }) {
+            decks[index].cards.removeAll()
+            saveData()
+        }
+    }
+
+    func deleteLearnedCards(deckId: UUID, minStreak: Int) {
+        if let index = decks.firstIndex(where: { $0.id == deckId }) {
+            decks[index].cards.removeAll { $0.streak >= minStreak }
+            saveData()
+        }
+    }
+
+    func resetAllProgress(deckId: UUID) {
+        if let index = decks.firstIndex(where: { $0.id == deckId }) {
+            for i in 0..<decks[index].cards.count {
+                decks[index].cards[i].streak = 0
+                decks[index].cards[i].isLearned = false
+            }
+            saveData()
+        }
     }
 
     func saveData() {

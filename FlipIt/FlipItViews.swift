@@ -12,13 +12,20 @@ struct NewDeckSheet: View {
     @State private var frontLabel: String = ""
     @State private var backLabel: String = ""
 
-    @State private var frontLanguage: String = "en-US"
-    @State private var backLanguage: String = "pl-PL"
+    @State private var frontLanguage: String
+    @State private var backLanguage: String
     // Zmienna sterująca wyświetlaniem alertu
     @State private var showDuplicateAlert = false
 
     // Callback do przekazania ID nowo utworzonego zestawu
     var onDeckCreated: ((UUID) -> Void)?
+
+    init(store: FlipItStore, onDeckCreated: ((UUID) -> Void)? = nil) {
+            self.store = store
+            self.onDeckCreated = onDeckCreated
+            _frontLanguage = State(initialValue: store.settings.defaultFrontLanguage)
+            _backLanguage = State(initialValue: store.settings.defaultBackLanguage)
+        }
 
     var body: some View {
         NavigationStack {
@@ -53,8 +60,8 @@ struct NewDeckSheet: View {
                                         }
                                     // Picker przesunięty do lewej, bez etykiety
                                     Picker("", selection: $frontLanguage) {
-                                        ForEach(availableLanguages.keys.sorted(), id: \.self) { key in
-                                            Text(availableLanguages[key] ?? key).tag(key)
+                                        ForEach(availableLanguages.sorted(by: { $0.value < $1.value }), id: \.key) { key, value in
+                                            Text(value).tag(key)
                                         }
                                     }
                                     .labelsHidden() // Ukrywa label "Language"
@@ -70,8 +77,8 @@ struct NewDeckSheet: View {
                                                 .foregroundStyle(backLabel.count >= AppLimits.label ? .red.opacity(0.8) : .secondary)
                                         }
                                     Picker("", selection: $backLanguage) {
-                                        ForEach(availableLanguages.keys.sorted(), id: \.self) { key in
-                                            Text(availableLanguages[key] ?? key).tag(key)
+                                        ForEach(availableLanguages.sorted(by: { $0.value < $1.value }), id: \.key) { key, value in
+                                            Text(value).tag(key)
                                         }
                                     }
                                     .labelsHidden()
@@ -308,8 +315,6 @@ struct DeleteDuplicatesSheet: View {
 
     // Logika: Szukamy kart, które mają taki sam Front I taki sam Back
     var duplicatesInfo: (count: Int, ids: Set<UUID>) {
-        var seen = Set<String>()
-        var duplicateIds = Set<UUID>()
         var bestCards: [String: Flashcard] = [:]
         var allDuplicateIds = Set<UUID>()
 
@@ -384,6 +389,173 @@ struct DeleteDuplicatesSheet: View {
                     .foregroundStyle(.red)
                     .fontWeight(.bold)
                     .disabled(duplicatesInfo.count == 0)
+                }
+            }
+        }
+    }
+}
+struct DeleteLearnedSheet: View {
+    @Environment(\.dismiss) var dismiss
+    @ObservedObject var store: FlipItStore
+    var deck: Deck
+
+    // ZMIANA: Używamy Double dla suwaka, domyślnie 3.0
+    @State private var minStreakValue: Double = 3.0
+
+    // Pomocnicza zmienna zamieniająca wartość suwaka na Int
+    var minStreak: Int {
+        Int(minStreakValue)
+    }
+
+    // Obliczamy na żywo, ile kart zostanie usuniętych
+    var cardsToDeleteCount: Int {
+        return deck.cards.filter { $0.streak >= minStreak }.count
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(header: Text("Criteria"), footer: Text("Cards with a streak of \(minStreak) or higher will be deleted.")) {
+                    VStack(spacing: 10) {
+                        // Wyświetlanie aktualnie wybranej wartości
+                        HStack {
+                            Text("Minimum Streak")
+                            Spacer()
+                            Text("\(minStreak)")
+                                .fontWeight(.bold)
+                                .font(.title3)
+                                .foregroundStyle(.blue)
+                                .frame(width: 30, alignment: .trailing)
+                        }
+
+                        // SUWAK OD 0 DO 10
+                        Slider(value: $minStreakValue, in: 0...10, step: 1) {
+                            Text("Streak")
+                        } minimumValueLabel: {
+                            Text("0").font(.caption).foregroundStyle(.secondary)
+                        } maximumValueLabel: {
+                            Text("10").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+
+                Section(header: Text("Summary")) {
+                    HStack {
+                        Text("Total cards")
+                        Spacer()
+                        Text("\(deck.cards.count)")
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("Cards to delete")
+                        Spacer()
+                        Text("\(cardsToDeleteCount)")
+                            .fontWeight(.bold)
+                            .foregroundStyle(cardsToDeleteCount > 0 ? .red : .secondary)
+                    }
+                }
+            }
+            .navigationTitle("Delete Learned Cards")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Delete") {
+                        // Przekazujemy wartość całkowitą (minStreak)
+                        store.deleteLearnedCards(deckId: deck.id, minStreak: minStreak)
+                        dismiss()
+                    }
+                    .foregroundStyle(.red)
+                    .fontWeight(.bold)
+                    .disabled(cardsToDeleteCount == 0)
+                }
+            }
+        }
+    }
+}
+struct ResetProgressSheet: View {
+    @Environment(\.dismiss) var dismiss
+    @ObservedObject var store: FlipItStore
+    var deck: Deck
+
+    // Obliczamy liczbę kart, które mają postęp (streak > 0)
+    var cardsWithProgress: Int {
+        deck.cards.filter { $0.streak > 0 }.count
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(header: Text("Summary")) {
+                    // 1. Wszystkie karty w talii
+                    HStack {
+                        Text("Total cards")
+                        Spacer()
+                        Text("\(deck.cards.count)")
+                            .foregroundStyle(.secondary)
+                    }
+
+                    // 2. Tylko karty z niezerowym licznikiem (do zresetowania)
+                    HStack {
+                        Text("Cards to reset (Streak > 0)")
+                        Spacer()
+                        Text("\(cardsWithProgress)")
+                            .fontWeight(.bold)
+                            .foregroundStyle(cardsWithProgress > 0 ? .orange : .secondary)
+                    }
+
+                    Text("All cards will be marked as 'Unknown' and streaks will return to 0.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Reset Progress")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Reset") {
+                        store.resetAllProgress(deckId: deck.id)
+                        dismiss()
+                    }
+                    .foregroundStyle(.orange)
+                    .fontWeight(.bold)
+                    // Przycisk aktywny tylko wtedy, gdy jest co resetować
+                    .disabled(cardsWithProgress == 0)
+                }
+            }
+        }
+    }
+}
+struct DeleteAllSheet: View {
+    @Environment(\.dismiss) var dismiss
+    @ObservedObject var store: FlipItStore
+    var deck: Deck
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(header: Text("Summary")) {
+                    HStack {
+                        Text("Cards to delete")
+                        Spacer()
+                        Text("\(deck.cards.count)")
+                            .fontWeight(.bold)
+                            .foregroundStyle(.red)
+                    }
+                    Text("This action cannot be undone. All cards will be permanently removed.")
+                        .font(.caption).foregroundStyle(.red)
+                }
+            }
+            .navigationTitle("Delete All Cards")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Delete All") {
+                        store.deleteAllCards(deckId: deck.id)
+                        dismiss()
+                    }
+                    .foregroundStyle(.red)
+                    .fontWeight(.bold)
+                    .disabled(deck.cards.isEmpty)
                 }
             }
         }
@@ -558,7 +730,6 @@ struct HomeView: View {
                                 .moveDisabled(index == 0)
                             }
                             .onMove(perform: store.moveDeck)
-                            .onDelete(perform: store.deleteDeck)
                         }
                         .listStyle(.plain)
                         .background(Color(uiColor: .secondarySystemGroupedBackground))
@@ -640,6 +811,7 @@ struct HomeView: View {
                                             Button(action: { showMoveCardsSheet = true }) {
                                                 Label("Move Cards", systemImage: "arrow.right.arrow.left.square")
                                             }
+                                            Divider()
                                             Button(action: { showGenerateView = true }) {
                                                 Label("Generate (AI)", systemImage: "sparkles")
                                             }
@@ -681,10 +853,9 @@ struct HomeView: View {
                             }
                         }
         }
+        .environment(\.locale, Locale(identifier: store.settings.appLanguage.rawValue))
         .onChange(of: scenePhase) { oldPhase, newPhase in
                     if newPhase == .active {
-                        // Gdy aplikacja staje się aktywna (np. po kliknięciu w widget)
-                        // wymuszamy odświeżenie danych z pliku
                         store.reloadData()
                     }
                 }
@@ -753,8 +924,8 @@ struct EditDeckSheet: View {
                                         .foregroundStyle(frontLabel.count >= AppLimits.label ? .red.opacity(0.8) : .secondary)
                                 }
                                 Picker("", selection: $frontLanguage) {
-                                    ForEach(availableLanguages.keys.sorted(), id: \.self) { key in
-                                        Text(availableLanguages[key] ?? key).tag(key)
+                                    ForEach(availableLanguages.sorted(by: { $0.value < $1.value }), id: \.key) { key, value in
+                                        Text(value).tag(key)
                                     }
                                 }
                                 .labelsHidden().pickerStyle(.menu)
@@ -771,8 +942,8 @@ struct EditDeckSheet: View {
                                         .foregroundStyle(backLabel.count >= AppLimits.label ? .red.opacity(0.8) : .secondary)
                                 }
                                 Picker("", selection: $backLanguage) {
-                                    ForEach(availableLanguages.keys.sorted(), id: \.self) { key in
-                                        Text(availableLanguages[key] ?? key).tag(key)
+                                    ForEach(availableLanguages.sorted(by: { $0.value < $1.value }), id: \.key) { key, value in
+                                        Text(value).tag(key)
                                     }
                                 }
                                 .labelsHidden().pickerStyle(.menu)
@@ -836,12 +1007,39 @@ struct SpeakerButton: View {
 
 let availableLanguages: [String: String] = [
     "en-US": "English (US)",
-    "en-GB": "English (UK)",
-    "pl-PL": "Polish",
-    "de-DE": "German",
-    "es-ES": "Spanish",
-    "fr-FR": "French",
-    "it-IT": "Italian"
+        "en-GB": "English (UK)",
+        "pl-PL": "Polish",
+        "de-DE": "German",
+        "es-ES": "Spanish",
+        "fr-FR": "French",
+        "it-IT": "Italian",
+
+    "pt-BR": "Portuguese (Brazil)",
+        "pt-PT": "Portuguese (Portugal)",
+        "ru-RU": "Russian",
+        "uk-UA": "Ukrainian", // (Dostępny w nowszych iOS)
+        "nl-NL": "Dutch",
+        "tr-TR": "Turkish",
+        "sv-SE": "Swedish",
+        "da-DK": "Danish",
+        "nb-NO": "Norwegian",
+        "fi-FI": "Finnish",
+        "hr-HR": "Croatian",
+        "cs-CZ": "Czech",
+        "sk-SK": "Slovak",      // Słowacki
+        "hu-HU": "Hungarian",   // Węgierski
+        "ro-RO": "Romanian",
+        "el-GR": "Greek",
+    "ja-JP": "Japanese",
+        "zh-CN": "Chinese (Simplified)",
+        "zh-TW": "Chinese (Traditional)",
+        "ko-KR": "Korean",
+        "vi-VN": "Vietnamese",
+        "hi-IN": "Hindi",
+        "id-ID": "Indonesian",
+        "th-TH": "Thai",
+    "ar-SA": "Arabic",
+    "he-IL": "Hebrew"
 ]
 
 func getLangCode(_ code: String) -> String {
@@ -863,11 +1061,28 @@ struct CardRowView: View {
     @State private var tempFront = ""
     @State private var tempBack = ""
 
+    private var streakColor: Color {
+            if card.streak == 0 {
+                return .red
+            } else if card.streak <= 3 {
+                return .orange
+            } else {
+                return .green
+            }
+        }
+
     var body: some View {
         HStack {
-            Image(systemName: card.isLearned ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(card.isLearned ? .green : .red)
-                .font(.system(size: 20))
+            ZStack {
+                            Circle()
+                                .fill(streakColor.opacity(0.15))
+                                .frame(width: 32, height: 32)
+
+                            Text("\(card.streak)")
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .foregroundStyle(streakColor)
+                        }
+                        .frame(width: 40)
 
             VStack(alignment: .leading) {
                 Text(card.front).font(.headline)
@@ -890,11 +1105,7 @@ struct CardRowView: View {
 
                 // Przycisk Usuwania
                 Button(action: {
-                    if store.settings.confirmDelete {
-                        showDeleteConfirmation = true
-                    } else {
-                        deleteCardNow()
-                    }
+                    showDeleteConfirmation = true
                 }) {
                     Image(systemName: "trash")
                         .foregroundStyle(.red)
@@ -977,6 +1188,9 @@ struct DeckDetailView: View {
     @ObservedObject var store: FlipItStore
     let initialDeckId: UUID
     @State private var selectedDeckId: UUID
+    @State private var showDeleteLearnedSheet = false
+    @State private var showResetProgressSheet = false
+    @State private var showDeleteAllSheet = false
 
     init(store: FlipItStore, deck: Deck) {
         self.store = store
@@ -1089,6 +1303,18 @@ struct DeckDetailView: View {
                     HStack(spacing: 16) {
                         Menu {
                             Button(action: { showEditDeck = true }) { Label("Edit Deck", systemImage: "pencil") }
+                            Divider()
+                            Button(action: { showResetProgressSheet = true }) {
+                                Label("Reset All Progress", systemImage: "arrow.counterclockwise")
+                            }
+
+                            Button(action: { showDeleteLearnedSheet = true }) {
+                                Label("Delete Learned Cards...", systemImage: "line.3.horizontal.decrease.circle")
+                            }
+
+                            Button(action: { showDeleteAllSheet = true }) {
+                                Label("Delete All Cards", systemImage: "trash.slash")
+                            }
                             Button(action: { showDeleteDuplicates = true }) {
                                                             Label("Delete Duplicates", systemImage: "doc.on.doc")
                                                         }
@@ -1112,6 +1338,7 @@ struct DeckDetailView: View {
                             Button(action: { showMoveCardsToSheet = true }) {
                                                             Label("Move Cards To Here", systemImage: "arrow.down.left.square")
                                                         }
+                            Divider()
                             Button(action: { showGenerateSheet = true }) {
                                 Label("Generate (AI)", systemImage: "sparkles")
                             }
@@ -1152,6 +1379,24 @@ struct DeckDetailView: View {
                         .presentationDetents([.large])
                 }
             }
+        .sheet(isPresented: $showDeleteLearnedSheet) {
+            if let deck = activeDeck {
+                DeleteLearnedSheet(store: store, deck: deck)
+                    .presentationDetents([.large])
+            }
+        }
+        .sheet(isPresented: $showResetProgressSheet) {
+            if let deck = activeDeck {
+                ResetProgressSheet(store: store, deck: deck)
+                    .presentationDetents([.large]) // Ten może być mniejszy
+            }
+        }
+        .sheet(isPresented: $showDeleteAllSheet) {
+            if let deck = activeDeck {
+                DeleteAllSheet(store: store, deck: deck)
+                    .presentationDetents([.large])
+            }
+        }
         .alert("Delete Deck", isPresented: $showDeleteDeckAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -1189,9 +1434,31 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section(header: Text("General")) {
-                    Toggle("Confirm Flashcards' Deletion", isOn: $store.settings.confirmDelete)
-                }
+
+                Section(header: Text("Default Languages")) {
+                                    // 1. Język Aplikacji
+                                    Picker("App Language", selection: $store.settings.appLanguage) {
+                                        ForEach(AppLanguage.allCases, id: \.self) { lang in
+                                            Text(lang.displayName).tag(lang)
+                                        }
+                                    }
+
+                                    // 2. Domyślny język Frontu (dla nowych talii)
+                                    Picker("Default Front Language", selection: $store.settings.defaultFrontLanguage) {
+                                        ForEach(availableLanguages.sorted(by: { $0.value < $1.value }), id: \.key) { key, value in
+                                            Text(value).tag(key)
+                                        }
+                                    }
+                                    .pickerStyle(.navigationLink) // Ładniejszy styl dla długiej listy
+
+                                    // 3. Domyślny język Tyłu (dla nowych talii)
+                                    Picker("Default Back Language", selection: $store.settings.defaultBackLanguage) {
+                                        ForEach(availableLanguages.sorted(by: { $0.value < $1.value }), id: \.key) { key, value in
+                                            Text(value).tag(key)
+                                        }
+                                    }
+                                    .pickerStyle(.navigationLink)
+                                }
 
                 // --- NOWA SEKCJA WIDGET ---
                 Section(header: Text("Widget")) {
@@ -1471,6 +1738,10 @@ struct StudySessionView: View {
                         .opacity(dragOffset.width < 0 ? abs(dragOffset.width) / 400.0 : 0)
                         .allowsHitTesting(false)
                 }
+                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing), // Nowa wjeżdża z prawej
+                                    removal: .identity // Stara nie animuje się systemowo (bo my ją wyrzucamy gestem)
+                                ))
                 .rotationEffect(.degrees(Double(dragOffset.width / 20)))
                 .offset(x: dragOffset.width, y: dragOffset.height * 0.4)
                 .gesture(
@@ -1483,7 +1754,10 @@ struct StudySessionView: View {
                         }
                 )
                 .onTapGesture {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { isFlipped.toggle() }
+                    //withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { isFlipped.toggle() }
+                    withAnimation(.easeInOut(duration: AnimationConfig.flipDuration)) {
+                        isFlipped.toggle()
+                    }
                 }
                 .padding()
                 Spacer()
@@ -1590,27 +1864,29 @@ struct StudySessionView: View {
     }
 
     func swipeRight() {
-        withAnimation(.easeOut(duration: 0.5)) { dragOffset.width = 1000 }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        withAnimation(.easeOut(duration: AnimationConfig.flyInDuration)) {
+                dragOffset.width = 1000
+            }
+        DispatchQueue.main.asyncAfter(deadline: .now() + AnimationConfig.nextCardDelay) {
             updateCurrentCard(isKnown: true)
             sessionReviewCount += 1
             sessionKnownCount += 1
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) { isFlipped = false; dragOffset = .zero }
-            withAnimation { pickNextCard() }
+            withAnimation(.easeOut(duration: AnimationConfig.flyInDuration)) { pickNextCard() }
         }
     }
 
     func swipeLeft() {
-        withAnimation(.easeOut(duration: 0.5)) { dragOffset.width = -1000 }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        withAnimation(.easeOut(duration: AnimationConfig.flyInDuration)) { dragOffset.width = -1000 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + AnimationConfig.nextCardDelay) {
             updateCurrentCard(isKnown: false)
             sessionReviewCount += 1
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) { isFlipped = false; dragOffset = .zero }
-            withAnimation { pickNextCard() }
+            withAnimation(.easeOut(duration: AnimationConfig.flyInDuration)) { pickNextCard() }
         }
     }
 }
@@ -2125,11 +2401,11 @@ struct AIGenerateView: View {
 
         promptText = """
         Topic/Context: \(deck.name) (\(deck.description))
-        Number of flashcards: 100
+        Number of flashcards: around 100 pairs
         Level: B1
         Side 1 (\(deck.frontLabel)): \(deck.frontLanguage)
         Side 2 (\(deck.backLabel)): \(deck.backLanguage)
-        Remarks: Use max \(AppLimits.label) letters per side. Nouns.
+        Remarks: Use max \(AppLimits.label) letters per side. Nouns. Apply lowercase unless it's a proper noun.
         Additional remarks: no
         """
     }
@@ -2347,7 +2623,7 @@ struct AIGenerateView: View {
         STRICT OUTPUT FORMAT RULES:
         1. Produce valid CSV data only.
         2. Separator: semicolon (;).
-        3. Format: Side1;Side2
+        3. Format: Side1;Side2 (each pair in a new line)
         4. Do NOT output headers.
         5. Do NOT use markdown code blocks (```).
         6. Do NOT write any introduction or explanation. Just raw data.

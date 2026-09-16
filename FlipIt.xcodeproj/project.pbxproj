@@ -327,6 +327,7 @@
 			knownRegions = (
 				en,
 				Base,
+				pl,
 			);
 			mainGroup = 54B704B42EF9E09900721E21;
 			minimizedProjectReferenceProxies = 1;
@@ -429,6 +430,8 @@
 /* Begin XCBuildConfiguration section */
 		54B704E22EF9E09A00721E21 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 54B704BF2EF9E09A00721E21 /* FlipIt */;
+			baseConfigurationReferenceRelativePath = Config.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -477,6 +480,8 @@
 		};
 		54B704E32EF9E09A00721E21 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 54B704BF2EF9E09A00721E21 /* FlipIt */;
+			baseConfigurationReferenceRelativePath = Config.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

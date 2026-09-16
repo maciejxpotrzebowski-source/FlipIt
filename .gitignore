@@ -1,1 +1,21 @@
+# Xcode & macOS
+.DS_Store
+*/.DS_Store
+
+# User-specific Xcode files
+*.xcuserstate
+project.xcworkspace/xcuserdata/
+*.xcuserdata
+xcuserdata/
+
+# Build & DerivedData
+build/
+DerivedData/
+
+# Secrets & Configs
 FlipIt/Config.xcconfig
+
+# Packaging
+*.ipa
+*.dSYM.zip
+*.dSYM

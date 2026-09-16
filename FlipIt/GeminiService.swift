@@ -2,13 +2,22 @@ import Foundation
 import GoogleGenerativeAI
 
 class GeminiService {
-    // ⚠️ WAŻNE: Wstaw tutaj swój klucz API z https://aistudio.google.com/app/apikey
-    private let apiKey = "AIzaSyDcJthHxtpSF7w2I30eHyqv46qF2xGoh0g"
+    // ZMIANA: Usuwamy hardcodowany klucz. Teraz pobieramy go bezpiecznie z managera.
+    // Dzięki temu klucz nie widnieje w kodzie źródłowym.
+    private var apiKey: String {
+        return APIKeyManager.geminiKey
+    }
 
     // Używamy modelu flash, bo jest szybki i wystarczający do tego zadania
+    // ZMIANA: Przekazujemy apiKey z naszej nowej właściwości computed property
     private lazy var model = GenerativeModel(name: "models/gemini-flash-lite-latest", apiKey: apiKey)
 
     func generateFlashcards(from prompt: String) async throws -> String {
+        // Sprawdzenie bezpieczeństwa - jeśli klucz jest pusty, rzuć błąd
+        guard !apiKey.isEmpty else {
+            throw NSError(domain: "GeminiService", code: 1, userInfo: [NSLocalizedDescriptionKey: "API Key is missing in Info.plist"])
+        }
+
         let response = try await model.generateContent(prompt)
 
         guard let text = response.text else {
