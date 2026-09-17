@@ -85,12 +85,72 @@ struct AIGenerateView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            if !store.settings.isPremiumUser {
+                VStack(spacing: 24) {
+                    Spacer()
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 64))
+                        .foregroundStyle(.yellow)
 
-                // --- CZĘŚĆ GÓRNA: USTAWIENIA (NIERUCHOMA) ---
-                List {
-                    // SEKCJA 1: WYBÓR TALII
-                    Section(header: Text("Destination Deck")) {
+                    VStack(spacing: 8) {
+                        Text("FlipIt Pro Required")
+                            .font(.title2.bold())
+                        Text("AI flashcard generation is powered by Google Gemini and is available exclusively for FlipIt Pro users.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                    }
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        Label("Unlimited AI flashcard generation", systemImage: "checkmark.seal.fill")
+                            .foregroundStyle(.primary)
+                        Label("Custom topic, level & vocabulary prompts", systemImage: "checkmark.seal.fill")
+                            .foregroundStyle(.primary)
+                        Label("Instant dual-language deck population", systemImage: "checkmark.seal.fill")
+                            .foregroundStyle(.primary)
+                    }
+                    .font(.subheadline)
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.appSecondaryGroupedBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .padding(.horizontal, 24)
+
+                    Button(action: {
+                        store.settings.isPremiumUser = true
+                        store.saveData()
+                    }) {
+                        HStack {
+                            Image(systemName: "sparkles")
+                            Text("Unlock FlipIt Pro")
+                        }
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .padding(.horizontal, 24)
+
+                    Spacer()
+                }
+                .background(Color.appGroupedBackground)
+                .navigationTitle("AI Generate")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }.fontWeight(.bold)
+                    }
+                }
+            } else {
+                VStack(spacing: 0) {
+
+                    // --- CZĘŚĆ GÓRNA: USTAWIENIA (NIERUCHOMA) ---
+                    List {
+                        // SEKCJA 1: WYBÓR TALII
+                        Section(header: Text("Destination Deck")) {
                         HStack(alignment: .center) {
                             Menu {
                                 Picker("Deck", selection: $selectedDeckId) {
@@ -278,6 +338,7 @@ struct AIGenerateView: View {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(errorMessage)
+            }
             }
         }
     }

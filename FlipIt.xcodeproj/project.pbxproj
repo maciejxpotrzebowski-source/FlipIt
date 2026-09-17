@@ -12,7 +12,7 @@
 		5489F0612F10635A00AA8947 /* WidgetKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 54B705362F03FE2F00721E21 /* WidgetKit.framework */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5489F0632F10635C00AA8947 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54B705382F03FE2F00721E21 /* SwiftUI.framework */; };
 		5489F0642F10635C00AA8947 /* SwiftUI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 54B705382F03FE2F00721E21 /* SwiftUI.framework */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		54B705462F03FE3100721E21 /* FlipItWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54B705342F03FE2F00721E21 /* FlipItWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		54B705462F03FE3100721E21 /* FlipItWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54B705342F03FE2F00721E21 /* FlipItWidgetExtension.appex */; platformFilters = (ios, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -61,6 +61,9 @@
 				54B705462F03FE3100721E21 /* FlipItWidgetExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
+			platformFilters = (
+				ios,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -422,6 +425,9 @@
 		};
 		54B705452F03FE3100721E21 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilters = (
+				ios,
+			);
 			target = 54B705332F03FE2F00721E21 /* FlipItWidgetExtension */;
 			targetProxy = 54B705442F03FE3100721E21 /* PBXContainerItemProxy */;
 		};
@@ -768,7 +774,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.maciek.FlipIt.FlipItWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = xros;
+				SDKROOT = auto;
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -804,7 +810,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.maciek.FlipIt.FlipItWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = xros;
+				SDKROOT = auto;
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

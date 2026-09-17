@@ -1,7 +1,11 @@
 import SwiftUI
 
 struct HomeView: View {
-    @StateObject var store = FlipItStore()
+    @ObservedObject var store: FlipItStore
+
+    init(store: FlipItStore) {
+        self.store = store
+    }
 
     // Obsługa widoków (Sheets)
     @State private var showAddCardSheet = false

@@ -103,6 +103,14 @@ enum AppLanguage: String, Codable, CaseIterable {
         case .polish: return "Polski"
         }
     }
+
+    static var systemDefault: AppLanguage {
+        let preferred = Locale.preferredLanguages.first ?? Locale.current.identifier
+        if preferred.lowercased().starts(with: "pl") {
+            return .polish
+        }
+        return .english
+    }
 }
 
 let availableLanguages: [String: String] = [
@@ -279,10 +287,61 @@ struct AppSettings: Codable {
     var widgetColorfulButtons: Bool = true
     var widgetInactivityColor: Bool = true
     var lastWidgetInteractionDate: Date = Date() // Data ostatniego kliknięcia
-    var appLanguage: AppLanguage = .english
-        // Domyślne języki dla nowych talii (np. użytkownik uczy się głównie Hiszpańskiego)
-        var defaultFrontLanguage: String = "en-US"
-        var defaultBackLanguage: String = "pl-PL"
+    var appLanguage: AppLanguage = .systemDefault
+    // Domyślne języki dla nowych talii (np. użytkownik uczy się głównie Hiszpańskiego)
+    var defaultFrontLanguage: String = "en-US"
+    var defaultBackLanguage: String = "pl-PL"
+    var isPremiumUser: Bool = false
+
+    init(
+        confirmDelete: Bool = true,
+        sortOption: CardSortOption = .frontAZ,
+        studySide: StudySideOption = .front,
+        onlyUnlearned: Bool = false,
+        learningFactorValue: Double = 1.0,
+        usedDeckIDs: Set<UUID> = [],
+        isDarkMode: Bool = false,
+        widgetColorfulButtons: Bool = true,
+        widgetInactivityColor: Bool = true,
+        lastWidgetInteractionDate: Date = Date(),
+        appLanguage: AppLanguage = .systemDefault,
+        defaultFrontLanguage: String = "en-US",
+        defaultBackLanguage: String = "pl-PL",
+        isPremiumUser: Bool = false
+    ) {
+        self.confirmDelete = confirmDelete
+        self.sortOption = sortOption
+        self.studySide = studySide
+        self.onlyUnlearned = onlyUnlearned
+        self.learningFactorValue = learningFactorValue
+        self.usedDeckIDs = usedDeckIDs
+        self.isDarkMode = isDarkMode
+        self.widgetColorfulButtons = widgetColorfulButtons
+        self.widgetInactivityColor = widgetInactivityColor
+        self.lastWidgetInteractionDate = lastWidgetInteractionDate
+        self.appLanguage = appLanguage
+        self.defaultFrontLanguage = defaultFrontLanguage
+        self.defaultBackLanguage = defaultBackLanguage
+        self.isPremiumUser = isPremiumUser
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        confirmDelete = try container.decodeIfPresent(Bool.self, forKey: .confirmDelete) ?? true
+        sortOption = try container.decodeIfPresent(CardSortOption.self, forKey: .sortOption) ?? .frontAZ
+        studySide = try container.decodeIfPresent(StudySideOption.self, forKey: .studySide) ?? .front
+        onlyUnlearned = try container.decodeIfPresent(Bool.self, forKey: .onlyUnlearned) ?? false
+        learningFactorValue = try container.decodeIfPresent(Double.self, forKey: .learningFactorValue) ?? 1.0
+        usedDeckIDs = try container.decodeIfPresent(Set<UUID>.self, forKey: .usedDeckIDs) ?? []
+        isDarkMode = try container.decodeIfPresent(Bool.self, forKey: .isDarkMode) ?? false
+        widgetColorfulButtons = try container.decodeIfPresent(Bool.self, forKey: .widgetColorfulButtons) ?? true
+        widgetInactivityColor = try container.decodeIfPresent(Bool.self, forKey: .widgetInactivityColor) ?? true
+        lastWidgetInteractionDate = try container.decodeIfPresent(Date.self, forKey: .lastWidgetInteractionDate) ?? Date()
+        appLanguage = try container.decodeIfPresent(AppLanguage.self, forKey: .appLanguage) ?? .systemDefault
+        defaultFrontLanguage = try container.decodeIfPresent(String.self, forKey: .defaultFrontLanguage) ?? "en-US"
+        defaultBackLanguage = try container.decodeIfPresent(String.self, forKey: .defaultBackLanguage) ?? "pl-PL"
+        isPremiumUser = try container.decodeIfPresent(Bool.self, forKey: .isPremiumUser) ?? false
+    }
 }
 
 // --- VIEW MODEL (STORE) ---
@@ -406,6 +465,15 @@ class FlipItStore: ObservableObject {
         return try? JSONDecoder().decode(WidgetState.self, from: data)
     }
 
+    func cleanupWidgetStateIfNeeded() {
+        if let widgetState = loadWidgetState(), let cardId = widgetState.currentCardId {
+            let allCardIds = Set(decks.flatMap { $0.cards.map { $0.id } })
+            if !allCardIds.contains(cardId) {
+                UserDefaults(suiteName: APP_GROUP_ID)?.removeObject(forKey: "WidgetState")
+            }
+        }
+    }
+
     // NOWA FUNKCJA: Aktualizuje datę ostatniego użycia widgetu
     func bumpWidgetInteraction() {
         settings.lastWidgetInteractionDate = Date()
@@ -456,10 +524,15 @@ class FlipItStore: ObservableObject {
         }
 
     func deleteDeck(at offsets: IndexSet) {
-            if offsets.contains(0) { return }
-            decks.remove(atOffsets: offsets)
-            saveData()
+        if offsets.contains(0) { return }
+        let deletedIDs = offsets.map { decks[$0].id }
+        decks.remove(atOffsets: offsets)
+        for id in deletedIDs {
+            settings.usedDeckIDs.remove(id)
         }
+        cleanupWidgetStateIfNeeded()
+        saveData()
+    }
 
     func addCard(to deckId: UUID, front: String, back: String) {
         if let index = decks.firstIndex(where: { $0.id == deckId }) {
@@ -477,29 +550,31 @@ class FlipItStore: ObservableObject {
     }
 
     func updateDeck(deckId: UUID, name: String, description: String, frontLabel: String, backLabel: String, frontLanguage: String, backLanguage: String) {
-            if let index = decks.firstIndex(where: { $0.id == deckId }) {
-                var finalName = name
-                if index == 0 {
-                    finalName = decks[index].name
-                }
-                decks[index].name = finalName
-                decks[index].description = description
-                decks[index].frontLabel = frontLabel
-                decks[index].backLabel = backLabel
-                // Aktualizacja języków
-                decks[index].frontLanguage = frontLanguage
-                decks[index].backLanguage = backLanguage
-                saveData()
+        if let index = decks.firstIndex(where: { $0.id == deckId }) {
+            var finalName = name
+            if index == 0 {
+                finalName = decks[index].name
             }
+            decks[index].name = finalName
+            decks[index].description = description
+            decks[index].frontLabel = frontLabel
+            decks[index].backLabel = backLabel
+            // Aktualizacja języków
+            decks[index].frontLanguage = frontLanguage
+            decks[index].backLanguage = backLanguage
+            saveData()
         }
+    }
 
     func deleteDeck(id: UUID) {
-            if let index = decks.firstIndex(where: { $0.id == id }) {
-                if index == 0 { return } // Blokada dla pierwszego elementu
-                decks.remove(at: index)
-                saveData()
-            }
+        if let index = decks.firstIndex(where: { $0.id == id }) {
+            if index == 0 { return } // Blokada dla pierwszego elementu
+            decks.remove(at: index)
+            settings.usedDeckIDs.remove(id)
+            cleanupWidgetStateIfNeeded()
+            saveData()
         }
+    }
 
     func moveDeck(from source: IndexSet, to destination: Int) {
         if source.contains(0) { return }

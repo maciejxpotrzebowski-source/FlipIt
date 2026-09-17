@@ -1,7 +1,141 @@
 /* 
-  Localizable.strings
+  Localizable.strings (English)
   FlipIt
-
-  Created by Maciek on 19/01/2026.
-  
 */
+
+// MARK: - General
+"Decks" = "Decks";
+"Cards" = "Cards";
+"Settings" = "Settings";
+"Study" = "Study";
+"Done" = "Done";
+"Cancel" = "Cancel";
+"Save" = "Save";
+"Delete" = "Delete";
+"Edit" = "Edit";
+"Back" = "Back";
+"Front" = "Front";
+"Close" = "Close";
+"Reset" = "Reset";
+"Add" = "Add";
+"Actions" = "Actions";
+"Are you sure?" = "Are you sure?";
+"OK" = "OK";
+
+// MARK: - Home View
+"No decks available" = "No decks available";
+"Tap the menu above to create your first deck." = "Tap the menu above to create your first deck.";
+"Create Deck" = "Create Deck";
+"New Deck" = "New Deck";
+"Add Card" = "Add Card";
+"Manage Decks" = "Manage Decks";
+"AI Flashcards" = "AI Flashcards";
+"Import Flashcards" = "Import Flashcards";
+
+// MARK: - Deck Detail View
+"Edit Deck" = "Edit Deck";
+"Add Flashcard" = "Add Flashcard";
+"Move / Copy Cards" = "Move / Copy Cards";
+"Delete Learned Cards" = "Delete Learned Cards";
+"Reset All Progress" = "Reset All Progress";
+"Delete Duplicates" = "Delete Duplicates";
+"Delete All Cards" = "Delete All Cards";
+"Delete Deck" = "Delete Deck";
+"No cards yet" = "No cards yet";
+"Tap + below or use AI/Import to add cards." = "Tap + below or use AI/Import to add cards.";
+"Add Cards" = "Add Cards";
+
+// MARK: - Study Setup & Session
+"Study Setup" = "Study Setup";
+"Start Study" = "Start Study";
+"Start Session" = "Start Session";
+"Study Order" = "Study Order";
+"Only Unlearned" = "Only Unlearned";
+"Card Side" = "Card Side";
+"Front First" = "Front First";
+"Back First" = "Back First";
+"Random Mix" = "Random Mix";
+"Session Finished!" = "Session Finished!";
+"Great job! You've reviewed all cards." = "Great job! You've reviewed all cards.";
+"Finish" = "Finish";
+"Again" = "Again";
+"Good" = "Good";
+"Easy" = "Easy";
+"Flip" = "Flip";
+"Front (A-Z)" = "Front (A-Z)";
+"Front (Z-A)" = "Front (Z-A)";
+"Back (A-Z)" = "Back (A-Z)";
+"Back (Z-A)" = "Back (Z-A)";
+"Oldest First" = "Oldest First";
+"Newest First" = "Newest First";
+"Known First" = "Known First";
+"Unknown First" = "Unknown First";
+
+// MARK: - Settings
+"Default Languages" = "Default Languages";
+"App Language" = "App Language";
+"Default Front Language" = "Default Front Language";
+"Default Back Language" = "Default Back Language";
+"Widget" = "Widget";
+"Colorful Buttons" = "Colorful Buttons";
+"Inactivity Reminder (Color)" = "Inactivity Reminder (Color)";
+"When enabled, the widget background will turn red if you haven't studied for a few days." = "When enabled, the widget background will turn red if you haven't studied for a few days.";
+"FlipIt Pro" = "FlipIt Pro";
+"FlipIt Pro Status" = "FlipIt Pro Status";
+"Active (AI flashcards unlocked)" = "Active (AI flashcards unlocked)";
+"Free tier" = "Free tier";
+
+// MARK: - AI Generate
+"AI Generate" = "AI Generate";
+"Destination Deck" = "Destination Deck";
+"Select Deck" = "Select Deck";
+"Instructions" = "Instructions";
+"Generate" = "Generate";
+"Generating..." = "Generating...";
+"Swap Columns" = "Swap Columns";
+"Preview" = "Preview";
+"No cards generated" = "No cards generated";
+"Review instructions above and tap Generate" = "Review instructions above and tap Generate";
+"FlipIt Pro Required" = "FlipIt Pro Required";
+"AI flashcard generation is powered by Google Gemini and is available exclusively for FlipIt Pro users." = "AI flashcard generation is powered by Google Gemini and is available exclusively for FlipIt Pro users.";
+"Unlimited AI flashcard generation" = "Unlimited AI flashcard generation";
+"Custom topic, level & vocabulary prompts" = "Custom topic, level & vocabulary prompts";
+"Instant dual-language deck population" = "Instant dual-language deck population";
+"Unlock FlipIt Pro" = "Unlock FlipIt Pro";
+"AI Error" = "AI Error";
+
+// MARK: - Import & Move Cards
+"Choose CSV or JSON file" = "Choose CSV or JSON file";
+"Destination" = "Destination";
+"Move Cards" = "Move Cards";
+"Transfer Cards" = "Transfer Cards";
+"Select Target Deck" = "Select Target Deck";
+"Move" = "Move";
+"Copy" = "Copy";
+"Delete original cards from source deck" = "Delete original cards from source deck";
+"Swap Front and Back" = "Swap Front and Back";
+"Skip Duplicates" = "Skip Duplicates";
+
+// MARK: - Sheets
+"Deck Name" = "Deck Name";
+"Description" = "Description";
+"Front Label" = "Front Label";
+"Back Label" = "Back Label";
+"Front Language" = "Front Language";
+"Back Language" = "Back Language";
+"Create" = "Create";
+"Save Changes" = "Save Changes";
+"Delete Learned" = "Delete Learned";
+"Minimum Streak" = "Minimum Streak";
+"Reset Progress" = "Reset Progress";
+"Reset Streaks" = "Reset Streaks";
+
+// MARK: - Widget
+"Study & Add" = "Study & Add";
+"FlipIt Minimal" = "FlipIt Minimal";
+"Select Decks" = "Select Decks";
+"Configure in App" = "Configure in App";
+"Deck is Empty" = "Deck is Empty";
+"Add Cards in App" = "Add Cards in App";
+"All Learned!" = "All Learned!";
+"Great job!" = "Great job!";

@@ -48,6 +48,27 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+
+                // --- SEKCJA PRO ---
+                Section(header: Text("FlipIt Pro")) {
+                    HStack {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("FlipIt Pro Status")
+                                    .font(.body)
+                                Text(store.settings.isPremiumUser ? "Active (AI flashcards unlocked)" : "Free tier")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: store.settings.isPremiumUser ? "crown.fill" : "crown")
+                                .foregroundStyle(store.settings.isPremiumUser ? .yellow : .secondary)
+                        }
+                        Spacer()
+                        Toggle("", isOn: $store.settings.isPremiumUser)
+                            .labelsHidden()
+                    }
+                }
             }
             .navigationTitle("Settings")
             .toolbar {

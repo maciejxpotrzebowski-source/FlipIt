@@ -52,6 +52,7 @@ struct Provider: AppIntentTimelineProvider {
                 let useColors = settings.widgetColorfulButtons
 
                 let activeDecks = store.decks.filter { settings.usedDeckIDs.contains($0.id) }
+                let totalCardsInActiveDecks = activeDecks.reduce(0) { $0 + $1.cards.count }
 
                 var candidates: [(card: Flashcard, deck: Deck)] = []
 
@@ -63,19 +64,18 @@ struct Provider: AppIntentTimelineProvider {
                     }
                 }
 
-                // Domyślne wartości (gdy brak kart)
-                var finalCard = Flashcard(front: "Add Decks", back: "Check App")
-                // Domyślne etykiety i języki, gdyby nic nie znaleziono
+                var finalCard: Flashcard
                 var fLabel = "Front"; var bLabel = "Back"
                 var fLang = "en-US"; var bLang = "pl-PL"
-
-                if !candidates.isEmpty {
-                     finalCard = Flashcard(front: "All Learned!", back: "Great job!")
-                }
                 var finalIsFlipped = false
 
-                // 2. LOGIKA WYBORU KARTY (korzystamy z candidates)
-                if !candidates.isEmpty {
+                if activeDecks.isEmpty {
+                    finalCard = Flashcard(front: "Select Decks", back: "Configure in App")
+                } else if totalCardsInActiveDecks == 0 {
+                    finalCard = Flashcard(front: "Deck is Empty", back: "Add Cards in App")
+                } else if candidates.isEmpty {
+                    finalCard = Flashcard(front: "All Learned!", back: "Great job!")
+                } else {
                     let savedState = store.loadWidgetState()
 
                     // Szukamy w naszej liście par (karta + deck)

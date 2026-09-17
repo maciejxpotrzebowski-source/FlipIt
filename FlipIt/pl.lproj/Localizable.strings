@@ -1,7 +1,141 @@
 /* 
-  Localizable.strings
+  Localizable.strings (Polish)
   FlipIt
-
-  Created by Maciek on 19/01/2026.
-  
 */
+
+// MARK: - General
+"Decks" = "Talie";
+"Cards" = "Karty";
+"Settings" = "Ustawienia";
+"Study" = "Nauka";
+"Done" = "Gotowe";
+"Cancel" = "Anuluj";
+"Save" = "Zapisz";
+"Delete" = "Usuń";
+"Edit" = "Edytuj";
+"Back" = "Wróć";
+"Front" = "Przód";
+"Close" = "Zamknij";
+"Reset" = "Resetuj";
+"Add" = "Dodaj";
+"Actions" = "Akcje";
+"Are you sure?" = "Czy na pewno?";
+"OK" = "OK";
+
+// MARK: - Home View
+"No decks available" = "Brak dostępnych talii";
+"Tap the menu above to create your first deck." = "Dotknij menu powyżej, aby utworzyć swoją pierwszą talię.";
+"Create Deck" = "Utwórz talię";
+"New Deck" = "Nowa talia";
+"Add Card" = "Dodaj kartę";
+"Manage Decks" = "Zarządzaj taliami";
+"AI Flashcards" = "Fiszki AI";
+"Import Flashcards" = "Importuj fiszki";
+
+// MARK: - Deck Detail View
+"Edit Deck" = "Edytuj talię";
+"Add Flashcard" = "Dodaj fiszkę";
+"Move / Copy Cards" = "Przenieś / kopiuj karty";
+"Delete Learned Cards" = "Usuń nauczone karty";
+"Reset All Progress" = "Zresetuj cały postęp";
+"Delete Duplicates" = "Usuń duplikaty";
+"Delete All Cards" = "Usuń wszystkie karty";
+"Delete Deck" = "Usuń talię";
+"No cards yet" = "Brak kart";
+"Tap + below or use AI/Import to add cards." = "Dotknij + poniżej lub użyj AI/Importu, aby dodać karty.";
+"Add Cards" = "Dodaj karty";
+
+// MARK: - Study Setup & Session
+"Study Setup" = "Ustawienia nauki";
+"Start Study" = "Rozpocznij naukę";
+"Start Session" = "Rozpocznij sesję";
+"Study Order" = "Kolejność nauki";
+"Only Unlearned" = "Tylko nienauczone";
+"Card Side" = "Strona karty";
+"Front First" = "Najpierw przód";
+"Back First" = "Najpierw tył";
+"Random Mix" = "Losowo";
+"Session Finished!" = "Sesja zakończona!";
+"Great job! You've reviewed all cards." = "Świetna robota! Przejrzano wszystkie karty.";
+"Finish" = "Zakończ";
+"Again" = "Jeszcze raz";
+"Good" = "Dobrze";
+"Easy" = "Łatwe";
+"Flip" = "Obróć";
+"Front (A-Z)" = "Przód (A-Z)";
+"Front (Z-A)" = "Przód (Z-A)";
+"Back (A-Z)" = "Tył (A-Z)";
+"Back (Z-A)" = "Tył (Z-A)";
+"Oldest First" = "Od najstarszych";
+"Newest First" = "Od najnowszych";
+"Known First" = "Najpierw umiane";
+"Unknown First" = "Najpierw nieumiane";
+
+// MARK: - Settings
+"Default Languages" = "Domyślne języki";
+"App Language" = "Język aplikacji";
+"Default Front Language" = "Domyślny język przodu";
+"Default Back Language" = "Domyślny język tyłu";
+"Widget" = "Widżet";
+"Colorful Buttons" = "Kolorowe przyciski";
+"Inactivity Reminder (Color)" = "Przypomnienie o braku aktywności (kolor)";
+"When enabled, the widget background will turn red if you haven't studied for a few days." = "Gdy włączone, tło widżetu zmieni kolor na czerwony, jeśli nie uczyłeś się przez kilka dni.";
+"FlipIt Pro" = "FlipIt Pro";
+"FlipIt Pro Status" = "Status FlipIt Pro";
+"Active (AI flashcards unlocked)" = "Aktywny (fiszki AI odblokowane)";
+"Free tier" = "Wersja bezpłatna";
+
+// MARK: - AI Generate
+"AI Generate" = "Generowanie AI";
+"Destination Deck" = "Talia docelowa";
+"Select Deck" = "Wybierz talię";
+"Instructions" = "Instrukcje";
+"Generate" = "Generuj";
+"Generating..." = "Generowanie...";
+"Swap Columns" = "Zamień kolumny";
+"Preview" = "Podgląd";
+"No cards generated" = "Brak wygenerowanych kart";
+"Review instructions above and tap Generate" = "Sprawdź instrukcje powyżej i dotknij Generuj";
+"FlipIt Pro Required" = "Wymagany FlipIt Pro";
+"AI flashcard generation is powered by Google Gemini and is available exclusively for FlipIt Pro users." = "Generowanie fiszek AI jest oparte na Google Gemini i jest dostępne wyłącznie dla użytkowników FlipIt Pro.";
+"Unlimited AI flashcard generation" = "Nielimitowane generowanie fiszek AI";
+"Custom topic, level & vocabulary prompts" = "Dostosowane prompty tematów, poziomów i słownictwa";
+"Instant dual-language deck population" = "Błyskawiczne wypełnianie talii dwujęzycznych";
+"Unlock FlipIt Pro" = "Odblokuj FlipIt Pro";
+"AI Error" = "Błąd AI";
+
+// MARK: - Import & Move Cards
+"Choose CSV or JSON file" = "Wybierz plik CSV lub JSON";
+"Destination" = "Cel";
+"Move Cards" = "Przenieś karty";
+"Transfer Cards" = "Przenieś karty";
+"Select Target Deck" = "Wybierz talię docelową";
+"Move" = "Przenieś";
+"Copy" = "Kopiuj";
+"Delete original cards from source deck" = "Usuń oryginalne karty z talii źródłowej";
+"Swap Front and Back" = "Zamień przód i tył";
+"Skip Duplicates" = "Pomiń duplikaty";
+
+// MARK: - Sheets
+"Deck Name" = "Nazwa talii";
+"Description" = "Opis";
+"Front Label" = "Etykieta przodu";
+"Back Label" = "Etykieta tyłu";
+"Front Language" = "Język przodu";
+"Back Language" = "Język tyłu";
+"Create" = "Utwórz";
+"Save Changes" = "Zapisz zmiany";
+"Delete Learned" = "Usuń nauczone";
+"Minimum Streak" = "Minimalny streak";
+"Reset Progress" = "Resetuj postęp";
+"Reset Streaks" = "Resetuj streaki";
+
+// MARK: - Widget
+"Study & Add" = "Ucz się i dodawaj";
+"FlipIt Minimal" = "FlipIt Minimalny";
+"Select Decks" = "Wybierz talie";
+"Configure in App" = "Skonfiguruj w aplikacji";
+"Deck is Empty" = "Talia jest pusta";
+"Add Cards in App" = "Dodaj karty w aplikacji";
+"All Learned!" = "Wszystko nauczone!";
+"Great job!" = "Świetna robota!";
