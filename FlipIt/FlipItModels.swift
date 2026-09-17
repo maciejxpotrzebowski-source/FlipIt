@@ -7,6 +7,84 @@ import WidgetKit
 // --- STAŁA GRUPY ---
 let APP_GROUP_ID = "group.com.maciek.FlipIt"
 
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
+extension Color {
+    static var appGroupedBackground: Color {
+        #if canImport(UIKit)
+        return Color(uiColor: .systemGroupedBackground)
+        #elseif canImport(AppKit)
+        return Color(nsColor: .windowBackgroundColor)
+        #else
+        return Color.gray.opacity(0.1)
+        #endif
+    }
+
+    static var appSecondaryGroupedBackground: Color {
+        #if canImport(UIKit)
+        return Color(uiColor: .secondarySystemGroupedBackground)
+        #elseif canImport(AppKit)
+        return Color(nsColor: .controlBackgroundColor)
+        #else
+        return Color.white
+        #endif
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func appInsetGroupedListStyle() -> some View {
+        #if os(iOS)
+        self.listStyle(.insetGrouped)
+        #else
+        self.listStyle(.inset)
+        #endif
+    }
+
+    @ViewBuilder
+    func appNavigationLinkPickerStyle() -> some View {
+        #if os(iOS)
+        self.pickerStyle(.navigationLink)
+        #else
+        self.pickerStyle(.menu)
+        #endif
+    }
+}
+
+extension ToolbarItemPlacement {
+    static var appTopBarLeading: ToolbarItemPlacement {
+        #if os(iOS)
+        return .topBarLeading
+        #else
+        return .navigation
+        #endif
+    }
+
+    static var appTopBarTrailing: ToolbarItemPlacement {
+        #if os(iOS)
+        return .topBarTrailing
+        #else
+        return .primaryAction
+        #endif
+    }
+}
+
+#if !os(iOS)
+public enum NavigationBarItemTitleDisplayModePlaceholder {
+    case automatic, inline, large
+}
+
+extension View {
+    public func navigationBarTitleDisplayMode(_ displayMode: NavigationBarItemTitleDisplayModePlaceholder) -> some View {
+        self
+    }
+}
+#endif
+
 struct AppLimits {
     static let deckName = 40
     static let deckDescription = 300
@@ -26,6 +104,47 @@ enum AppLanguage: String, Codable, CaseIterable {
         }
     }
 }
+
+let availableLanguages: [String: String] = [
+    "en-US": "English (US)",
+    "en-GB": "English (UK)",
+    "pl-PL": "Polish",
+    "de-DE": "German",
+    "es-ES": "Spanish",
+    "fr-FR": "French",
+    "it-IT": "Italian",
+    "pt-BR": "Portuguese (Brazil)",
+    "pt-PT": "Portuguese (Portugal)",
+    "ru-RU": "Russian",
+    "uk-UA": "Ukrainian",
+    "nl-NL": "Dutch",
+    "tr-TR": "Turkish",
+    "sv-SE": "Swedish",
+    "da-DK": "Danish",
+    "nb-NO": "Norwegian",
+    "fi-FI": "Finnish",
+    "hr-HR": "Croatian",
+    "cs-CZ": "Czech",
+    "sk-SK": "Slovak",
+    "hu-HU": "Hungarian",
+    "ro-RO": "Romanian",
+    "el-GR": "Greek",
+    "ja-JP": "Japanese",
+    "zh-CN": "Chinese (Simplified)",
+    "zh-TW": "Chinese (Traditional)",
+    "ko-KR": "Korean",
+    "vi-VN": "Vietnamese",
+    "hi-IN": "Hindi",
+    "id-ID": "Indonesian",
+    "th-TH": "Thai",
+    "ar-SA": "Arabic",
+    "he-IL": "Hebrew"
+]
+
+func getLangCode(_ code: String) -> String {
+    return String(code.prefix(2)).uppercased()
+}
+
 // --- DATA MODELS ---
 struct AnimationConfig {
     // Szybkość obracania karty (im mniejsza liczba, tym szybciej)
@@ -178,22 +297,32 @@ class FlipItStore: ObservableObject {
     init() {
         loadData()
         if decks.isEmpty {
-            decks.append(Deck(name: "My fleshcards", description: "My primary deck", cards: [
+            decks.append(Deck(name: "My flashcards", description: "My primary deck", cards: [
                 Flashcard(front: "Cat", back: "Kot"),
                 Flashcard(front: "Dog", back: "Pies"),
                 Flashcard(front: "Apple", back: "Jabłko")
             ]))
             saveData()
         }
-        NotificationCenter.default.addObserver(
-                forName: UIApplication.willEnterForegroundNotification,
+        #if canImport(UIKit)
+        let foregroundNotification: Notification.Name? = UIApplication.willEnterForegroundNotification
+        #elseif canImport(AppKit)
+        let foregroundNotification: Notification.Name? = NSApplication.willBecomeActiveNotification
+        #else
+        let foregroundNotification: Notification.Name? = nil
+        #endif
+
+        if let notificationName = foregroundNotification {
+            NotificationCenter.default.addObserver(
+                forName: notificationName,
                 object: nil,
-                queue: .main // Wymuszamy kolejkę główną dla NotificationCenter
+                queue: .main
             ) { _ in
                 Task { @MainActor in
                     self.reloadData()
                 }
             }
+        }
     }
 
     // MARK: - Persistence
