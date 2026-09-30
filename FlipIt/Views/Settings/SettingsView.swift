@@ -4,8 +4,8 @@ struct SettingsView: View {
     @ObservedObject var store: FlipItStore
     @Environment(\.dismiss) var dismiss
 
-    // Teraz operujemy bezpośrednio na store.settings, aby zmiany były natychmiastowe
-    // i od razu widoczne w całej aplikacji/widgetach po zapisie.
+    @State private var telemetryEventCount: Int = StudyTelemetryManager.shared.eventsCount()
+    @State private var showClearTelemetryAlert: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -69,8 +69,47 @@ struct SettingsView: View {
                             .labelsHidden()
                     }
                 }
+
+                // --- SEKCJA UCZENIE I TELEMETRIA ---
+                Section(
+                    header: Text("Learning & Telemetry"),
+                    footer: Text("Help calibrate FlipIt's adaptive algorithms. When enabled, strictly anonymous metrics (reaction times, streaks, difficulty transitions) are recorded. Flashcard text is NEVER collected.")
+                ) {
+                    Toggle("Improve Learning Algorithms", isOn: $store.settings.analyticsEnabled)
+
+                    if store.settings.analyticsEnabled {
+                        HStack {
+                            Text("Recorded Events")
+                            Spacer()
+                            Text("\(telemetryEventCount)")
+                                .foregroundStyle(.secondary)
+                        }
+
+                        if telemetryEventCount > 0 {
+                            ShareLink(
+                                item: StudyTelemetryManager.shared.exportJSON(),
+                                preview: SharePreview("FlipIt Study Telemetry", image: Image(systemName: "chart.xyaxis.line"))
+                            ) {
+                                Label("Export Anonymous Logs", systemImage: "square.and.arrow.up")
+                            }
+
+                            Button(role: .destructive, action: { showClearTelemetryAlert = true }) {
+                                Label("Clear Telemetry Logs", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
             }
             .navigationTitle("Settings")
+            .alert("Clear Telemetry Data", isPresented: $showClearTelemetryAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear", role: .destructive) {
+                    StudyTelemetryManager.shared.clearEvents()
+                    telemetryEventCount = 0
+                }
+            } message: {
+                Text("Are you sure you want to delete all locally recorded learning telemetry?")
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

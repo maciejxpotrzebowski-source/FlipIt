@@ -194,4 +194,112 @@ struct FlipItTests {
         let lang = AppLanguage.systemDefault
         #expect(lang == .polish || lang == .english)
     }
+
+    @Test("Leitner transitions advance box on success and apply soft penalty on error")
+    @MainActor
+    func testLeitnerTransitionsAndSoftPenalty() {
+        let store = FlipItStore()
+        let deckId = UUID()
+        let card = Flashcard(front: "Sun", back: "Słońce", box: 2, nextReviewDate: Date())
+        let deck = Deck(id: deckId, name: "Leitner Test", cards: [card])
+        store.decks = [deck]
+
+        // 1. Success from box 2 -> box 3
+        store.updateStreak(deckId: deckId, cardId: card.id, newStreak: 1, isKnown: true)
+        let updatedCard1 = store.decks.first?.cards.first
+        #expect(updatedCard1?.box == 3)
+        #expect(updatedCard1?.correctCount == 1)
+        #expect(updatedCard1?.isLearned == false)
+
+        // 2. Success from box 3 -> box 4 (Mastered!)
+        store.updateStreak(deckId: deckId, cardId: card.id, newStreak: 2, isKnown: true)
+        let updatedCard2 = store.decks.first?.cards.first
+        #expect(updatedCard2?.box == 4)
+        #expect(updatedCard2?.isLearned == true)
+
+        // 3. Error on box 4 -> soft penalty drops to box 3 (NOT 0!)
+        store.updateStreak(deckId: deckId, cardId: card.id, newStreak: 0, isKnown: false)
+        let updatedCard3 = store.decks.first?.cards.first
+        #expect(updatedCard3?.box == 3)
+        #expect(updatedCard3?.incorrectCount == 1)
+        #expect(updatedCard3?.isLearned == false)
+    }
+
+    @Test("AdaptiveCardSelector triggers Morale Rescue after 3 consecutive failures")
+    func testAdaptiveSelectorMoraleRescue() {
+        let deckId = UUID()
+        let hardCard = Flashcard(front: "Difficult", back: "Trudne", box: 0, correctCount: 1, incorrectCount: 5)
+        let easyCard = Flashcard(front: "Easy", back: "Łatwe", box: 3, correctCount: 10, incorrectCount: 1)
+
+        let pool = [(card: hardCard, deckId: deckId), (card: easyCard, deckId: deckId)]
+
+        // 2 failures -> normal mode
+        let result2Fails = AdaptiveCardSelector.selectNextCard(
+            from: pool,
+            consecutiveFailures: 2,
+            consecutiveSuccesses: 0,
+            preferredSide: .front
+        )
+        #expect(result2Fails?.reason != .moraleRescue)
+
+        // 3 failures -> Morale Rescue triggered! Must pick easyCard
+        let result3Fails = AdaptiveCardSelector.selectNextCard(
+            from: pool,
+            consecutiveFailures: 3,
+            consecutiveSuccesses: 0,
+            preferredSide: .front
+        )
+        #expect(result3Fails?.reason == .moraleRescue)
+        #expect(result3Fails?.card.front == "Easy")
+    }
+
+    @Test("AdaptiveCardSelector triggers Challenge Engine after 5 consecutive successes")
+    func testAdaptiveSelectorChallengeEngine() {
+        let deckId = UUID()
+        let normalCard = Flashcard(front: "Normal", back: "Normalne", box: 2, correctCount: 5, incorrectCount: 1)
+        let leechCard = Flashcard(front: "Leech", back: "Trudny orzech", box: 1, correctCount: 2, incorrectCount: 4)
+
+        let pool = [(card: normalCard, deckId: deckId), (card: leechCard, deckId: deckId)]
+
+        // 4 successes -> normal mode
+        let result4Wins = AdaptiveCardSelector.selectNextCard(
+            from: pool,
+            consecutiveFailures: 0,
+            consecutiveSuccesses: 4,
+            preferredSide: .front
+        )
+        #expect(result4Wins?.reason != .challengeLeech)
+
+        // 5 successes -> Challenge Engine triggered! Must pick leechCard
+        let result5Wins = AdaptiveCardSelector.selectNextCard(
+            from: pool,
+            consecutiveFailures: 0,
+            consecutiveSuccesses: 5,
+            preferredSide: .front
+        )
+        #expect(result5Wins?.reason == .challengeLeech)
+        #expect(result5Wins?.card.front == "Leech")
+    }
+
+    @Test("StudyTelemetry logs events and supports export and clear")
+    func testStudyTelemetryLogging() {
+        StudyTelemetryManager.shared.clearEvents()
+        #expect(StudyTelemetryManager.shared.eventsCount() == 0)
+
+        StudyTelemetryManager.shared.logEvent(StudyTelemetryEvent(
+            eventType: "review",
+            isKnown: true,
+            boxBefore: 1,
+            boxAfter: 2,
+            consecutiveStreak: 3
+        ))
+        #expect(StudyTelemetryManager.shared.eventsCount() == 1)
+
+        let json = StudyTelemetryManager.shared.exportJSON()
+        #expect(json.contains("\"eventType\":\"review\""))
+        #expect(json.contains("\"isKnown\":true"))
+
+        StudyTelemetryManager.shared.clearEvents()
+        #expect(StudyTelemetryManager.shared.eventsCount() == 0)
+    }
 }

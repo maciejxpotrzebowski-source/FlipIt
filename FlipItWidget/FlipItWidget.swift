@@ -93,29 +93,18 @@ struct Provider: AppIntentTimelineProvider {
                         bLang = foundPair.deck.backLanguage
 
                     } else {
-                        // B. LOSOWANIE NOWEJ
-                        let factor = settings.learningFactorValue
+                        // B. LEITNER SELECTION: bierzemy karty, których termin powtórki minął (nextReviewDate <= now)
+                        let now = Date()
+                        let dueCandidates = candidates.filter { $0.card.nextReviewDate <= now }
+                        let pool = dueCandidates.isEmpty ? candidates : dueCandidates
 
-                        // Ważenie na podstawie streaka karty
-                        let weightedItems = candidates.map { pair -> (item: (card: Flashcard, deck: Deck), weight: Double) in
-                            (pair, 1.0 / (1.0 + (Double(pair.card.streak) * factor)))
+                        // Sortowanie: najniższe pudełko najpierw (Box 0 > Box 1...), potem najstarsze
+                        let sorted = pool.sorted { a, b in
+                            if a.card.box != b.card.box { return a.card.box < b.card.box }
+                            return a.card.nextReviewDate < b.card.nextReviewDate
                         }
 
-                        let totalWeight = weightedItems.reduce(0) { $0 + $1.weight }
-                        let randomVal = Double.random(in: 0..<totalWeight)
-                        var cursor = 0.0
-
-                        // Fallback na pierwszy element
-                        var selectedPair = candidates.first!
-
-                        for element in weightedItems {
-                            cursor += element.weight
-                            if cursor >= randomVal {
-                                selectedPair = element.item
-                                break
-                            }
-                        }
-
+                        let selectedPair = sorted.first ?? candidates.first!
                         finalCard = selectedPair.card
 
                         // Pobieramy dane z decka BEZPOŚREDNIO z wylosowanej pary

@@ -74,9 +74,8 @@ struct HomeView: View {
                     }
                 }
             }
-            // ZMIANA: Ukrywamy standardowy tytuł, żeby użyć naszego własnego (statycznego)
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("FlipIt")
+            .navigationBarTitleDisplayMode(.large)
 
 
             // --- PRZYCISK START STUDYING ---
@@ -99,19 +98,8 @@ struct HomeView: View {
 
             // --- TOOLBAR (Przyciski zostają w systemowym pasku u góry) ---
             .toolbar {
-                            // LEWA STRONA (TopBarLeading)
-                ToolbarItem(placement: .appTopBarLeading) {
-                            // W trybie normalnym pokazujemy tytuł aplikacji
-                            Text(" FlipIt ")
-                                .font(.system(size: 36, weight: .bold, design: .default))
-                                .fontWeight(.bold)
-                                .fixedSize(horizontal: true, vertical: false)
-                    }
-                    #if os(iOS)
-                    .sharedBackgroundVisibility(.hidden)
-                    #endif
-                            // PRAWA STRONA (TopBarTrailing) - Główne menu
-                            ToolbarItem(placement: .appTopBarTrailing) {
+                // PRAWA STRONA (TopBarTrailing) - Główne menu
+                ToolbarItem(placement: .appTopBarTrailing) {
                                     HStack(spacing: 16) {
                                         // 1. ZĘBATKA (Niebieska) -> Settings / Manage Decks
                                         Menu {

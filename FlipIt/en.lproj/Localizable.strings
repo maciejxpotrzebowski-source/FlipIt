@@ -139,3 +139,17 @@
 "Add Cards in App" = "Add Cards in App";
 "All Learned!" = "All Learned!";
 "Great job!" = "Great job!";
+
+// MARK: - Telemetry & Adaptive Learning
+"Learning & Telemetry" = "Learning & Telemetry";
+"Improve Learning Algorithms" = "Improve Learning Algorithms";
+"Help calibrate FlipIt's adaptive algorithms. When enabled, strictly anonymous metrics (reaction times, streaks, difficulty transitions) are recorded. Flashcard text is NEVER collected." = "Help calibrate FlipIt's adaptive algorithms. When enabled, strictly anonymous metrics (reaction times, streaks, difficulty transitions) are recorded. Flashcard text is NEVER collected.";
+"Recorded Events" = "Recorded Events";
+"Export Anonymous Logs" = "Export Anonymous Logs";
+"Clear Telemetry Logs" = "Clear Telemetry Logs";
+"Clear Telemetry Data" = "Clear Telemetry Data";
+"Are you sure you want to delete all locally recorded learning telemetry?" = "Are you sure you want to delete all locally recorded learning telemetry?";
+"✨ Morale Boost" = "✨ Morale Boost";
+"🔥 Challenge" = "🔥 Challenge";
+"🌱 New" = "🌱 New";
+"Mastered: %d" = "Mastered: %d";

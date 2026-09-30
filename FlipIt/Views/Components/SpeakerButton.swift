@@ -14,7 +14,7 @@ struct SpeakerButton: View {
             Image(systemName: "speaker.wave.2.circle.fill")
                 .font(.system(size: 32)) // Duży, wyraźny przycisk
                 .foregroundStyle(.blue.opacity(0.8))
-                .background(.white)
+                .background(Color.appSecondaryGroupedBackground)
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)

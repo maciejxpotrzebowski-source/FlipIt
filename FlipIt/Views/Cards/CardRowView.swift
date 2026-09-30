@@ -13,28 +13,36 @@ struct CardRowView: View {
     @State private var tempFront = ""
     @State private var tempBack = ""
 
-    private var streakColor: Color {
-            if card.streak == 0 {
-                return .red
-            } else if card.streak <= 3 {
-                return .orange
-            } else {
-                return .green
-            }
+    private var badgeColor: Color {
+        if card.isLearned {
+            return .green
+        } else if card.box >= 2 {
+            return .blue
+        } else if card.box == 1 {
+            return .orange
+        } else {
+            return .red
         }
+    }
 
     var body: some View {
         HStack {
             ZStack {
-                            Circle()
-                                .fill(streakColor.opacity(0.15))
-                                .frame(width: 32, height: 32)
+                Circle()
+                    .fill(badgeColor.opacity(0.15))
+                    .frame(width: 32, height: 32)
 
-                            Text("\(card.streak)")
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
-                                .foregroundStyle(streakColor)
-                        }
-                        .frame(width: 40)
+                if card.isLearned {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(badgeColor)
+                } else {
+                    Text("\(card.streak)")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(badgeColor)
+                }
+            }
+            .frame(width: 40)
 
             VStack(alignment: .leading) {
                 Text(card.front).font(.headline)

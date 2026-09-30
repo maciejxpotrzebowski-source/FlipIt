@@ -169,17 +169,84 @@ struct Flashcard: Identifiable, Codable, Equatable {
     var id = UUID()
     var front: String
     var back: String
-    var isLearned: Bool = false
     var streak: Int = 0
     var createdAt: Date = Date()
 
-    init(id: UUID = UUID(), front: String, back: String, isLearned: Bool = false, streak: Int = 0, createdAt: Date = Date()) {
+    // --- Leitner Box System (0 - 4) ---
+    var box: Int = 0                    // Pudełko Leitnera (0 = nowa/natychmiast, 1 = 1d, 2 = 3d, 3 = 7d, 4 = 21d)
+    var nextReviewDate: Date = Date()   // Kiedy powtórzyć
+    var lastReviewDate: Date? = nil     // Kiedy ostatnio widziana
+    var correctCount: Int = 0           // Łączna liczba poprawnych
+    var incorrectCount: Int = 0         // Łączna liczba błędnych
+
+    // isLearned jest obliczane z poziomu pudełka Leitnera (pudełko 4 = trwale nauczona)
+    var isLearned: Bool {
+        get { box >= 4 }
+        set {
+            if newValue {
+                box = max(box, 4)
+            } else {
+                if box >= 4 { box = 3 }
+            }
+        }
+    }
+
+    /// Interwał w sekundach dla danego pudełka Leitnera
+    static func leitnerInterval(for box: Int) -> TimeInterval {
+        switch box {
+        case 0: return 0                    // Natychmiast
+        case 1: return 1 * 86400            // 1 dzień
+        case 2: return 3 * 86400            // 3 dni
+        case 3: return 7 * 86400            // 7 dni
+        case 4: return 21 * 86400           // 21 dni
+        default: return 30 * 86400
+        }
+    }
+
+    /// Historyczna skuteczność karty (0.0 do 1.0)
+    var accuracyRatio: Double {
+        let total = correctCount + incorrectCount
+        if total == 0 { return 0.5 }
+        return Double(correctCount) / Double(total)
+    }
+
+    /// Czy karta jest tzw. "pijawką" (częste pomyłki, trudna do zapamiętania)
+    var isLeech: Bool {
+        return incorrectCount >= 2 && accuracyRatio < 0.6
+    }
+
+    init(
+        id: UUID = UUID(),
+        front: String,
+        back: String,
+        isLearned: Bool = false,
+        streak: Int = 0,
+        createdAt: Date = Date(),
+        box: Int = 0,
+        nextReviewDate: Date = Date(),
+        lastReviewDate: Date? = nil,
+        correctCount: Int = 0,
+        incorrectCount: Int = 0
+    ) {
         self.id = id
         self.front = front
         self.back = back
-        self.isLearned = isLearned
         self.streak = streak
         self.createdAt = createdAt
+        // Jeśli przekazano isLearned=true bez określonego boxu, ustawiamy box=4 dla kompatybilności wstecznej
+        if isLearned && box == 0 {
+            self.box = 4
+        } else {
+            self.box = box
+        }
+        self.nextReviewDate = nextReviewDate
+        self.lastReviewDate = lastReviewDate
+        self.correctCount = correctCount
+        self.incorrectCount = incorrectCount
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, front, back, streak, createdAt, box, nextReviewDate, lastReviewDate, correctCount, incorrectCount, isLearned
     }
 
     init(from decoder: Decoder) throws {
@@ -187,9 +254,38 @@ struct Flashcard: Identifiable, Codable, Equatable {
         id = try container.decode(UUID.self, forKey: .id)
         front = try container.decode(String.self, forKey: .front)
         back = try container.decode(String.self, forKey: .back)
-        isLearned = try container.decodeIfPresent(Bool.self, forKey: .isLearned) ?? false
         streak = try container.decodeIfPresent(Int.self, forKey: .streak) ?? 0
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        box = try container.decodeIfPresent(Int.self, forKey: .box) ?? 0
+        nextReviewDate = try container.decodeIfPresent(Date.self, forKey: .nextReviewDate) ?? Date()
+        lastReviewDate = try container.decodeIfPresent(Date.self, forKey: .lastReviewDate)
+        correctCount = try container.decodeIfPresent(Int.self, forKey: .correctCount) ?? 0
+        incorrectCount = try container.decodeIfPresent(Int.self, forKey: .incorrectCount) ?? 0
+
+        // Migracja ze starszych wersji: jeśli isLearned było true, lub streak > 0 a brak box
+        if box == 0 {
+            let legacyIsLearned = try container.decodeIfPresent(Bool.self, forKey: .isLearned) ?? false
+            if legacyIsLearned {
+                box = 4
+            } else if streak > 0 {
+                box = min(streak, 3)
+            }
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(front, forKey: .front)
+        try container.encode(back, forKey: .back)
+        try container.encode(streak, forKey: .streak)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(box, forKey: .box)
+        try container.encode(nextReviewDate, forKey: .nextReviewDate)
+        try container.encodeIfPresent(lastReviewDate, forKey: .lastReviewDate)
+        try container.encode(correctCount, forKey: .correctCount)
+        try container.encode(incorrectCount, forKey: .incorrectCount)
+        try container.encode(isLearned, forKey: .isLearned)
     }
 }
 
@@ -292,6 +388,7 @@ struct AppSettings: Codable {
     var defaultFrontLanguage: String = "en-US"
     var defaultBackLanguage: String = "pl-PL"
     var isPremiumUser: Bool = false
+    var analyticsEnabled: Bool = false // Anonimowa telemetria uczenia
 
     init(
         confirmDelete: Bool = true,
@@ -307,7 +404,8 @@ struct AppSettings: Codable {
         appLanguage: AppLanguage = .systemDefault,
         defaultFrontLanguage: String = "en-US",
         defaultBackLanguage: String = "pl-PL",
-        isPremiumUser: Bool = false
+        isPremiumUser: Bool = false,
+        analyticsEnabled: Bool = false
     ) {
         self.confirmDelete = confirmDelete
         self.sortOption = sortOption
@@ -323,6 +421,7 @@ struct AppSettings: Codable {
         self.defaultFrontLanguage = defaultFrontLanguage
         self.defaultBackLanguage = defaultBackLanguage
         self.isPremiumUser = isPremiumUser
+        self.analyticsEnabled = analyticsEnabled
     }
 
     init(from decoder: Decoder) throws {
@@ -341,6 +440,194 @@ struct AppSettings: Codable {
         defaultFrontLanguage = try container.decodeIfPresent(String.self, forKey: .defaultFrontLanguage) ?? "en-US"
         defaultBackLanguage = try container.decodeIfPresent(String.self, forKey: .defaultBackLanguage) ?? "pl-PL"
         isPremiumUser = try container.decodeIfPresent(Bool.self, forKey: .isPremiumUser) ?? false
+        analyticsEnabled = try container.decodeIfPresent(Bool.self, forKey: .analyticsEnabled) ?? false
+    }
+}
+
+// --- STUDY TELEMETRY & ANALYTICS ---
+
+struct StudyTelemetryEvent: Codable, Identifiable {
+    var id: UUID = UUID()
+    var timestamp: Date = Date()
+    var eventType: String // "review", "widget_review", "morale_rescue", "challenge_boost"
+    var isKnown: Bool?
+    var boxBefore: Int?
+    var boxAfter: Int?
+    var consecutiveStreak: Int?
+    var wasMoraleBooster: Bool = false
+    var wasChallenge: Bool = false
+    var responseTimeSeconds: Double?
+}
+
+class StudyTelemetryManager {
+    static let shared = StudyTelemetryManager()
+    private let fileName = "study_telemetry.json"
+    private let maxEvents = 2000
+
+    private func getFileURL() -> URL {
+        if let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: APP_GROUP_ID) {
+            return groupURL.appendingPathComponent(fileName)
+        }
+        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(fileName)
+    }
+
+    private func getFallbackURL() -> URL {
+        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(fileName)
+    }
+
+    func logEvent(_ event: StudyTelemetryEvent) {
+        var events = loadEvents()
+        events.append(event)
+        if events.count > maxEvents {
+            events = Array(events.suffix(maxEvents))
+        }
+        saveEvents(events)
+    }
+
+    func loadEvents() -> [StudyTelemetryEvent] {
+        let url = getFileURL()
+        if let data = try? Data(contentsOf: url),
+           let events = try? JSONDecoder().decode([StudyTelemetryEvent].self, from: data) {
+            return events
+        }
+        let fallbackURL = getFallbackURL()
+        if let data = try? Data(contentsOf: fallbackURL),
+           let events = try? JSONDecoder().decode([StudyTelemetryEvent].self, from: data) {
+            return events
+        }
+        return []
+    }
+
+    private func saveEvents(_ events: [StudyTelemetryEvent]) {
+        let url = getFileURL()
+        if let data = try? JSONEncoder().encode(events) {
+            do {
+                try data.write(to: url, options: .atomic)
+            } catch {
+                // Gdy zapis do App Group nie powiedzie się (np. testy jednostkowe bez profilu), zapisz do katalogu dokumentów
+                let fallbackURL = getFallbackURL()
+                try? data.write(to: fallbackURL, options: .atomic)
+            }
+        }
+    }
+
+    func clearEvents() {
+        let url = getFileURL()
+        try? FileManager.default.removeItem(at: url)
+        let fallbackURL = getFallbackURL()
+        try? FileManager.default.removeItem(at: fallbackURL)
+    }
+
+    func exportJSON() -> String {
+        let events = loadEvents()
+        if let data = try? JSONEncoder().encode(events), let string = String(data: data, encoding: .utf8) {
+            return string
+        }
+        return "[]"
+    }
+
+    func eventsCount() -> Int {
+        return loadEvents().count
+    }
+}
+
+// --- ADAPTIVE LEARNING CONTROLLER (LEITNER + CASINO MORALE & CHALLENGE ENGINE) ---
+
+struct AdaptiveCardSelector {
+    enum SelectionReason: String, Codable {
+        case normalDue
+        case moraleRescue
+        case challengeLeech
+        case challengeNew
+        case standardPractice
+
+        var displayBadge: String? {
+            switch self {
+            case .moraleRescue: return "✨ Morale Boost"
+            case .challengeLeech: return "🔥 Challenge"
+            case .challengeNew: return "🌱 New"
+            default: return nil
+            }
+        }
+    }
+
+    struct SelectionResult {
+        let card: Flashcard
+        let deckId: UUID
+        let reason: SelectionReason
+        let reverseSide: Bool
+    }
+
+    static func selectNextCard(
+        from pool: [(card: Flashcard, deckId: UUID)],
+        consecutiveFailures: Int,
+        consecutiveSuccesses: Int,
+        preferredSide: StudySideOption
+    ) -> SelectionResult? {
+        guard !pool.isEmpty else { return nil }
+
+        let now = Date()
+
+        // 1. MORALE RESCUE (PITY SYSTEM): 3 lub więcej błędów z rzędu -> podrzucamy łatwiejszą opcję
+        if consecutiveFailures >= 3 {
+            // Szukamy karty o wysokiej pewności (wyższe pudełko lub wysoki ratio sukcesu)
+            let confidenceCandidates = pool.filter { $0.card.box >= 2 || $0.card.accuracyRatio > 0.75 }
+            if let best = confidenceCandidates.max(by: { $0.card.accuracyRatio < $1.card.accuracyRatio }) {
+                return SelectionResult(card: best.card, deckId: best.deckId, reason: .moraleRescue, reverseSide: false)
+            }
+            if let fallback = pool.max(by: { $0.card.correctCount < $1.card.correctCount }) {
+                return SelectionResult(card: fallback.card, deckId: fallback.deckId, reason: .moraleRescue, reverseSide: false)
+            }
+        }
+
+        // 2. CHALLENGE ENGINE: 5 lub więcej sukcesów z rzędu -> podkręcamy trudność, by nauka była przyjemnym wysiłkiem
+        if consecutiveSuccesses >= 5 {
+            // Priorytet A: Pijawka (karta sprawiająca w przeszłości trudności)
+            let leeches = pool.filter { $0.card.isLeech }
+            if let leech = leeches.randomElement() {
+                return SelectionResult(card: leech.card, deckId: leech.deckId, reason: .challengeLeech, reverseSide: false)
+            }
+
+            // Priorytet B: Nowa karta (nigdy niewidziana lub z pudełka 0)
+            let newCards = pool.filter { $0.card.lastReviewDate == nil || ($0.card.box == 0 && $0.card.correctCount == 0) }
+            if let newCard = newCards.randomElement() {
+                return SelectionResult(card: newCard.card, deckId: newCard.deckId, reason: .challengeNew, reverseSide: false)
+            }
+
+            // Priorytet C: Odwrócenie strony (wymuszenie aktywnej produkcji zamiast biernego rozpoznawania)
+            if let card = pool.randomElement() {
+                return SelectionResult(card: card.card, deckId: card.deckId, reason: .challengeLeech, reverseSide: true)
+            }
+        }
+
+        // 3. STANDARD LEITNER: Karty, których termin powtórki już minął
+        let dueCards = pool.filter { $0.card.nextReviewDate <= now }
+        let activePool = dueCards.isEmpty ? pool : dueCards
+
+        // Sortowanie: najniższe pudełka najpierw (Box 0 > Box 1...), potem najstarsze z daty
+        let sorted = activePool.sorted { a, b in
+            if a.card.box != b.card.box { return a.card.box < b.card.box }
+            return a.card.nextReviewDate < b.card.nextReviewDate
+        }
+
+        guard let chosen = sorted.first else {
+            let first = pool.first!
+            return SelectionResult(card: first.card, deckId: first.deckId, reason: .standardPractice, reverseSide: false)
+        }
+
+        let isReversed: Bool
+        switch preferredSide {
+        case .front: isReversed = false
+        case .back: isReversed = true
+        case .random: isReversed = Bool.random()
+        }
+
+        return SelectionResult(
+            card: chosen.card,
+            deckId: chosen.deckId,
+            reason: dueCards.isEmpty ? .standardPractice : .normalDue,
+            reverseSide: isReversed
+        )
     }
 }
 
@@ -403,16 +690,21 @@ class FlipItStore: ObservableObject {
 
     func deleteLearnedCards(deckId: UUID, minStreak: Int) {
         if let index = decks.firstIndex(where: { $0.id == deckId }) {
-            decks[index].cards.removeAll { $0.streak >= minStreak }
+            decks[index].cards.removeAll { $0.isLearned || $0.streak >= minStreak }
             saveData()
         }
     }
 
     func resetAllProgress(deckId: UUID) {
         if let index = decks.firstIndex(where: { $0.id == deckId }) {
+            let now = Date()
             for i in 0..<decks[index].cards.count {
                 decks[index].cards[i].streak = 0
-                decks[index].cards[i].isLearned = false
+                decks[index].cards[i].box = 0
+                decks[index].cards[i].nextReviewDate = now
+                decks[index].cards[i].lastReviewDate = nil
+                decks[index].cards[i].correctCount = 0
+                decks[index].cards[i].incorrectCount = 0
             }
             saveData()
         }
@@ -487,13 +779,34 @@ class FlipItStore: ObservableObject {
     func updateStreakAfterWidgetAction(cardIdString: String, isKnown: Bool) {
         for (dIndex, deck) in decks.enumerated() {
             if let cIndex = deck.cards.firstIndex(where: { $0.id.uuidString == cardIdString }) {
+                let now = Date()
+                let oldBox = decks[dIndex].cards[cIndex].box
+                let newBox: Int
+
                 if isKnown {
                     decks[dIndex].cards[cIndex].streak += 1
+                    decks[dIndex].cards[cIndex].correctCount += 1
+                    newBox = min(oldBox + 1, 4)
                 } else {
                     decks[dIndex].cards[cIndex].streak = 0
+                    decks[dIndex].cards[cIndex].incorrectCount += 1
+                    // Łagodna kara: cofnięcie o 1 pudełko zamiast do 0
+                    newBox = max(oldBox - 1, 0)
                 }
-                decks[dIndex].cards[cIndex].isLearned = (decks[dIndex].cards[cIndex].streak > 0)
+                decks[dIndex].cards[cIndex].box = newBox
+                decks[dIndex].cards[cIndex].lastReviewDate = now
+                decks[dIndex].cards[cIndex].nextReviewDate = now.addingTimeInterval(Flashcard.leitnerInterval(for: newBox))
                 saveData()
+
+                if settings.analyticsEnabled {
+                    StudyTelemetryManager.shared.logEvent(StudyTelemetryEvent(
+                        eventType: "widget_review",
+                        isKnown: isKnown,
+                        boxBefore: oldBox,
+                        boxAfter: newBox,
+                        consecutiveStreak: decks[dIndex].cards[cIndex].streak
+                    ))
+                }
                 break
             }
         }
@@ -641,12 +954,38 @@ class FlipItStore: ObservableObject {
         }
     }
 
-    func updateStreak(deckId: UUID, cardId: UUID, newStreak: Int) {
+    func updateStreak(deckId: UUID, cardId: UUID, newStreak: Int, isKnown: Bool = true, wasMoraleBooster: Bool = false, wasChallenge: Bool = false) {
         if let dIndex = decks.firstIndex(where: { $0.id == deckId }),
            let cIndex = decks[dIndex].cards.firstIndex(where: { $0.id == cardId }) {
+            let now = Date()
+            let oldBox = decks[dIndex].cards[cIndex].box
             decks[dIndex].cards[cIndex].streak = newStreak
-            decks[dIndex].cards[cIndex].isLearned = (newStreak > 0)
+            decks[dIndex].cards[cIndex].lastReviewDate = now
+
+            let newBox: Int
+            if isKnown {
+                decks[dIndex].cards[cIndex].correctCount += 1
+                newBox = min(oldBox + 1, 4)
+            } else {
+                decks[dIndex].cards[cIndex].incorrectCount += 1
+                // Łagodna kara: cofnięcie o 1 pudełko
+                newBox = max(oldBox - 1, 0)
+            }
+            decks[dIndex].cards[cIndex].box = newBox
+            decks[dIndex].cards[cIndex].nextReviewDate = now.addingTimeInterval(Flashcard.leitnerInterval(for: newBox))
             saveData()
+
+            if settings.analyticsEnabled {
+                StudyTelemetryManager.shared.logEvent(StudyTelemetryEvent(
+                    eventType: "review",
+                    isKnown: isKnown,
+                    boxBefore: oldBox,
+                    boxAfter: newBox,
+                    consecutiveStreak: newStreak,
+                    wasMoraleBooster: wasMoraleBooster,
+                    wasChallenge: wasChallenge
+                ))
+            }
         }
     }
 

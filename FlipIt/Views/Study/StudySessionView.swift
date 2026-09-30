@@ -19,44 +19,57 @@ struct StudySessionView: View {
     @State private var sessionReviewCount = 0
     @State private var sessionKnownCount = 0
 
-    // ... body pozostaje bez zmian ...
-    // (Pamiętaj tylko, aby upewnić się, że body używa nowego layoutu statystyk, który zrobiliśmy w poprzednim kroku)
+    // Adaptive Learning State (Casino Morale & Challenge Engine)
+    @State private var consecutiveFailures = 0
+    @State private var consecutiveSuccesses = 0
+    @State private var currentReason: AdaptiveCardSelector.SelectionReason = .normalDue
 
     var body: some View {
-        // ... (Kod widoku jest taki sam jak w poprzedniej odpowiedzi) ...
-        // ... (Wklej tutaj ciało widoku z poprzedniego kroku, jeśli nie masz go pod ręką) ...
         VStack {
-             if activePool.isEmpty && currentItem == nil {
+            if activePool.isEmpty && currentItem == nil {
                 if initialLoadDone {
-                    VStack(spacing: 20) {
-                        Text("🎉")
-                            .font(.system(size: 80))
-                        Text("No cards available!")
-                            .font(.title)
-                            .fontWeight(.bold)
-                        Text("Check your deck selection.")
-                            .foregroundStyle(.secondary)
-                    }
+                    ContentUnavailableView(
+                        "No cards available!",
+                        systemImage: "checkmark.seal.fill",
+                        description: Text("All caught up! Check your deck selection or add new cards.")
+                    )
                 } else {
                     ProgressView("Loading...")
                 }
             } else if let item = currentItem {
 
-                // --- TOP STATS ---
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Session Known: \(sessionKnownCount)")
-                        Text("Reviewed: \(sessionReviewCount)")
+                // --- TOP STATS & ADAPTIVE BADGE ---
+                VStack(spacing: 8) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Session Known: \(sessionKnownCount)")
+                            Text("Reviewed: \(sessionReviewCount)")
+                        }
+                        .font(.caption)
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text("Cards in pool: \(activePool.count)")
+                            Text("Mastered: \(activePool.filter { $0.card.isLearned }.count)")
+                        }
+                        .font(.caption)
                     }
-                    .font(.caption)
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("Cards in deck: \(activePool.count)")
-                        Text("Total Known: \(activePool.filter { $0.card.isLearned }.count)")
+
+                    // Adaptive Morale / Challenge Badge
+                    if let badge = currentReason.displayBadge {
+                        HStack {
+                            Text(badge)
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(currentReason == .moraleRescue ? Color.orange.opacity(0.18) : Color.purple.opacity(0.18))
+                                .foregroundStyle(currentReason == .moraleRescue ? Color.orange : Color.purple)
+                                .clipShape(Capsule())
+                        }
                     }
-                    .font(.caption)
                 }
-                .padding()
+                .padding(.horizontal)
+                .padding(.top, 4)
 
                 // --- CARD AREA ---
                 ZStack {
@@ -64,27 +77,27 @@ struct StudySessionView: View {
                     let endText = isFrontFirst ? item.card.back : item.card.front
 
                     let currentDeck = store.decks.first(where: { $0.id == item.deckId })
-                                        let frontLang = currentDeck?.frontLanguage ?? "en-US"
-                                        let backLang = currentDeck?.backLanguage ?? "pl-PL"
-                                        let frontLbl = currentDeck?.frontLabel ?? "Front"
-                                        let backLbl = currentDeck?.backLabel ?? "Back"
+                    let frontLang = currentDeck?.frontLanguage ?? "en-US"
+                    let backLang = currentDeck?.backLanguage ?? "pl-PL"
+                    let frontLbl = currentDeck?.frontLabel ?? "Front"
+                    let backLbl = currentDeck?.backLabel ?? "Back"
 
-                                        let startLabel = isFrontFirst ? frontLbl : backLbl
-                                        let endLabel = isFrontFirst ? backLbl : frontLbl
+                    let startLabel = isFrontFirst ? frontLbl : backLbl
+                    let endLabel = isFrontFirst ? backLbl : frontLbl
 
-                                        let startLang = isFrontFirst ? frontLang : backLang
-                                        let endLang = isFrontFirst ? backLang : frontLang
+                    let startLang = isFrontFirst ? frontLang : backLang
+                    let endLang = isFrontFirst ? backLang : frontLang
 
-                                        ZStack {
-                                            // TYŁ KARTY (po obrocie)
-                                            CardView(text: endText, label: endLabel, language: endLang, backgroundColor: .white)
-                                                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-                                                .opacity(isFlipped ? 1 : 0)
+                    ZStack {
+                        // TYŁ KARTY (po obrocie)
+                        CardView(text: endText, label: endLabel, language: endLang)
+                            .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                            .opacity(isFlipped ? 1 : 0)
 
-                                            // PRZÓD KARTY
-                                            CardView(text: startText, label: startLabel, language: startLang, backgroundColor: .white)
-                                                .opacity(isFlipped ? 0 : 1)
-                                        }
+                        // PRZÓD KARTY
+                        CardView(text: startText, label: startLabel, language: startLang)
+                            .opacity(isFlipped ? 0 : 1)
+                    }
                     .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
 
                     RoundedRectangle(cornerRadius: 20)
@@ -98,9 +111,9 @@ struct StudySessionView: View {
                         .allowsHitTesting(false)
                 }
                 .transition(.asymmetric(
-                                    insertion: .move(edge: .trailing), // Nowa wjeżdża z prawej
-                                    removal: .identity // Stara nie animuje się systemowo (bo my ją wyrzucamy gestem)
-                                ))
+                    insertion: .move(edge: .trailing),
+                    removal: .identity
+                ))
                 .rotationEffect(.degrees(Double(dragOffset.width / 20)))
                 .offset(x: dragOffset.width, y: dragOffset.height * 0.4)
                 .gesture(
@@ -113,7 +126,6 @@ struct StudySessionView: View {
                         }
                 )
                 .onTapGesture {
-                    //withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { isFlipped.toggle() }
                     withAnimation(.easeInOut(duration: AnimationConfig.flipDuration)) {
                         isFlipped.toggle()
                     }
@@ -151,7 +163,6 @@ struct StudySessionView: View {
 
     // --- LOGIC ---
 
-    // Funkcja loadPool bez zmian...
     func loadPool() {
         var newPool: [(card: Flashcard, deckId: UUID)] = []
         for deck in store.decks where selectedDeckIds.contains(deck.id) {
@@ -164,68 +175,89 @@ struct StudySessionView: View {
         initialLoadDone = true
     }
 
-    // --- UPDATED ALGORITHM ---
+    // --- ADAPTIVE CARD SELECTION ---
     func pickNextCard() {
         if activePool.isEmpty {
             currentItem = nil
             return
         }
 
-        // ZMIANA: Używamy lokalnej zmiennej przekazanej z StudySetupView
-        let x = learningFactor.rawValue
+        // Używamy inteligentnego AdaptiveCardSelector z mechaniką Morale i Challenge
+        if let result = AdaptiveCardSelector.selectNextCard(
+            from: activePool,
+            consecutiveFailures: consecutiveFailures,
+            consecutiveSuccesses: consecutiveSuccesses,
+            preferredSide: studySide
+        ) {
+            currentItem = (result.card, result.deckId)
+            currentReason = result.reason
+            isFrontFirst = !result.reverseSide
+            isFlipped = false
+            dragOffset = .zero
 
-        // ... Reszta logiki ważonej bez zmian ...
-        let weightedItems = activePool.map { item -> (item: (card: Flashcard, deckId: UUID), weight: Double) in
-            let n = Double(item.card.streak)
-            let weight = 1.0 / (1.0 + (n * x))
-            return (item, weight)
-        }
-
-        let totalWeight = weightedItems.reduce(0) { $0 + $1.weight }
-        let randomValue = Double.random(in: 0..<totalWeight)
-
-        var cursor = 0.0
-        var selectedItem: (card: Flashcard, deckId: UUID)? = nil
-
-        for element in weightedItems {
-            cursor += element.weight
-            if cursor >= randomValue {
-                selectedItem = element.item
-                break
+            // Zmniejsz licznik serii sukcesów po zaserwowaniu wyzwania, by nie bombardować trudnymi kartami
+            if result.reason == .challengeLeech || result.reason == .challengeNew {
+                consecutiveSuccesses = 0
             }
-        }
-
-        if selectedItem == nil { selectedItem = activePool.first }
-
-        if let found = selectedItem {
-            currentItem = found
-            switch studySide {
-            case .front: isFrontFirst = true
-            case .back: isFrontFirst = false
-            case .random: isFrontFirst = Bool.random()
-            }
+        } else {
+            currentItem = activePool.first
+            currentReason = .normalDue
+            isFrontFirst = true
             isFlipped = false
             dragOffset = .zero
         }
     }
 
-    // ... Reszta funkcji (updateCurrentCard, swipeRight, swipeLeft) bez zmian ...
     func updateCurrentCard(isKnown: Bool) {
         guard let item = currentItem else { return }
 
+        let wasMorale = (currentReason == .moraleRescue)
+        let wasChallenge = (currentReason == .challengeLeech || currentReason == .challengeNew)
+
+        // Aktualizacja serii dla mechaniki kasyna / morale / wyzwania
+        if isKnown {
+            consecutiveSuccesses += 1
+            consecutiveFailures = 0
+        } else {
+            consecutiveFailures += 1
+            consecutiveSuccesses = 0
+        }
+
         if let index = activePool.firstIndex(where: { $0.card.id == item.card.id }) {
             var updatedCard = activePool[index].card
-            if isKnown { updatedCard.streak += 1 } else { updatedCard.streak = 0 }
-            updatedCard.isLearned = (updatedCard.streak > 0)
+            let now = Date()
+            let oldBox = updatedCard.box
+
+            if isKnown {
+                updatedCard.streak += 1
+                updatedCard.correctCount += 1
+                updatedCard.box = min(oldBox + 1, 4)
+            } else {
+                updatedCard.streak = 0
+                updatedCard.incorrectCount += 1
+                // Łagodna kara (cofnięcie o 1 pudełko)
+                updatedCard.box = max(oldBox - 1, 0)
+            }
+
+            updatedCard.lastReviewDate = now
+            updatedCard.nextReviewDate = now.addingTimeInterval(Flashcard.leitnerInterval(for: updatedCard.box))
             activePool[index].card = updatedCard
-            store.updateStreak(deckId: item.deckId, cardId: item.card.id, newStreak: updatedCard.streak)
+
+            store.updateStreak(
+                deckId: item.deckId,
+                cardId: item.card.id,
+                newStreak: updatedCard.streak,
+                isKnown: isKnown,
+                wasMoraleBooster: wasMorale,
+                wasChallenge: wasChallenge
+            )
         }
     }
 
     func swipeRight() {
         withAnimation(.easeOut(duration: AnimationConfig.flyInDuration)) {
-                dragOffset.width = 1000
-            }
+            dragOffset.width = 1000
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + AnimationConfig.nextCardDelay) {
             updateCurrentCard(isKnown: true)
             sessionReviewCount += 1

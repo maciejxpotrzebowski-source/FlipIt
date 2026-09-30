@@ -4,16 +4,15 @@ struct CardView: View {
     var text: String
     var label: String      // Np. "Słówko" lub "Definicja"
     var language: String   // Kod języka dla głośnika
-    var backgroundColor: Color
     var displayLabel: String {
-            "\(label) (\(getLangCode(language)))"
-        }
+        "\(label) (\(getLangCode(language)))"
+    }
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
-                .fill(backgroundColor)
-                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                .fill(Color.appSecondaryGroupedBackground)
+                .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
 
             VStack(spacing: 0) {
                 // 1. LABEL NA GÓRZE (małymi literami)
@@ -21,7 +20,7 @@ struct CardView: View {
                     .font(.caption)
                     .fontWeight(.semibold)
                     .textCase(.uppercase)
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(.secondary)
                     .padding(.top, 32)
 
                 Spacer()
@@ -32,14 +31,13 @@ struct CardView: View {
                     .fontWeight(.bold)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.primary)
                     .minimumScaleFactor(0.5)
 
                 Spacer()
                 // 3. GŁOŚNIK (pod słowem)
                 SpeakerButton(text: text, language: language)
                     .padding(.bottom, 64)
-                //Spacer()
             }
         }
         .frame(height: 400)

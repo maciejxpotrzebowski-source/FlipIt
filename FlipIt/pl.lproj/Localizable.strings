@@ -139,3 +139,17 @@
 "Add Cards in App" = "Dodaj karty w aplikacji";
 "All Learned!" = "Wszystko nauczone!";
 "Great job!" = "Świetna robota!";
+
+// MARK: - Telemetry & Adaptive Learning
+"Learning & Telemetry" = "Uczenie i telemetria";
+"Improve Learning Algorithms" = "Pomóż ulepszać algorytmy";
+"Help calibrate FlipIt's adaptive algorithms. When enabled, strictly anonymous metrics (reaction times, streaks, difficulty transitions) are recorded. Flashcard text is NEVER collected." = "Pomóż kalibrować adaptacyjne algorytmy FlipIt. Po włączeniu zbierane są wyłącznie anonimowe metryki (czasy reakcji, serie, przejścia trudności). Treść fiszek NIGDY nie jest zbierana.";
+"Recorded Events" = "Zarejestrowane zdarzenia";
+"Export Anonymous Logs" = "Eksportuj anonimowe logi";
+"Clear Telemetry Logs" = "Wyczyść logi telemetrii";
+"Clear Telemetry Data" = "Wyczyść dane telemetrii";
+"Are you sure you want to delete all locally recorded learning telemetry?" = "Czy na pewno chcesz usunąć wszystkie lokalnie zapisane dane telemetrii uczenia?";
+"✨ Morale Boost" = "✨ Doładowanie morale";
+"🔥 Challenge" = "🔥 Wyzwanie";
+"🌱 New" = "🌱 Nowe słówko";
+"Mastered: %d" = "Opanowane: %d";
