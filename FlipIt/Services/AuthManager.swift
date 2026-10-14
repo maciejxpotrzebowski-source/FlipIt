@@ -474,13 +474,17 @@ final class AuthManager: ObservableObject {
     }
     
     func deleteAccount() async throws {
-        guard let user = currentUser else { return }
-        // Usunięcie rekordu z public.profiles uruchamia trigger bazodanowy handle_profile_deleted(),
-        // który przenosi nick do tabeli reserved_usernames z 60-dniową karencją.
-        try await client.from("profiles")
-            .delete()
-            .eq("id", value: user.id)
-            .execute()
+        guard currentUser != nil else { return }
+        
+        struct DeleteAccountResult: Decodable {
+            let success: Bool
+            let error: String?
+        }
+        
+        let result: DeleteAccountResult = try await client.rpc("delete_my_account").execute().value
+        if !result.success {
+            throw AuthError.custom(result.error ?? "Failed to delete account")
+        }
         
         try await client.auth.signOut()
         currentUser = nil

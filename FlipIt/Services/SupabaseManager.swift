@@ -129,6 +129,9 @@ class SupabaseManager {
     }
     
     func publishDeck(_ deck: MarketDeckUpload) async throws -> SharedDeck {
+        guard deck.authorId != nil else {
+            throw AuthError.notAuthenticated
+        }
         let response: SharedDeck = try await client.from("shared_decks")
             .insert(deck)
             .select()
@@ -274,17 +277,20 @@ class SupabaseManager {
     
     func reportUsageStats(shareCode: String, reviewsCount: Int, isReturnUser: Bool = false) async throws {
         struct UsageParams: Encodable {
-            let share_code: String
-            let reviews_count: Int
-            let is_return_user: Bool
+            let p_share_code: String
+            let p_reviews_count: Int
+            let p_is_return_user: Bool
         }
         
-        try await client.rpc("report_usage_stats", params: UsageParams(share_code: shareCode, reviews_count: reviewsCount, is_return_user: isReturnUser))
+        try await client.rpc("report_usage_stats", params: UsageParams(p_share_code: shareCode, p_reviews_count: reviewsCount, p_is_return_user: isReturnUser))
             .execute()
     }
     
     @discardableResult
     func updateMarketDeck(shareCode: String, upload: MarketDeckUpload) async throws -> SharedDeck {
+        guard upload.authorId != nil else {
+            throw AuthError.notAuthenticated
+        }
         let sanitizedCode = shareCode.normalizedShareCode
         let response: SharedDeck = try await client.from("shared_decks")
             .update(upload)
@@ -298,38 +304,19 @@ class SupabaseManager {
     
     func removeFromMarket(shareCode: String) async throws {
         let sanitizedCode = shareCode.normalizedShareCode
-        
         struct UnpublishRPCParams: Encodable {
             let target_code: String
         }
-        
-        // 1. Spróbuj wywołać procedurę RPC (omija restrykcje RLS dzięki SECURITY DEFINER)
-        do {
-            try await client.rpc("unpublish_deck", params: UnpublishRPCParams(target_code: sanitizedCode)).execute()
-            return
-        } catch {
-            // Kontynuuj do bezpośredniego update jako fallback
-        }
-        
-        // 2. Bezpośrednia zmiana w tabeli shared_decks
-        struct UnpublishParams: Encodable {
-            let is_public: Bool
-        }
-        try await client.from("shared_decks")
-            .update(UnpublishParams(is_public: false))
-            .eq("share_code", value: sanitizedCode)
-            .execute()
+        try await client.rpc("unpublish_deck", params: UnpublishRPCParams(target_code: sanitizedCode)).execute()
     }
     
     func setMarketVisibility(shareCode: String, isPublic: Bool) async throws {
         let sanitizedCode = shareCode.normalizedShareCode
-        struct VisibilityParams: Encodable {
+        struct VisibilityRPCParams: Encodable {
+            let target_code: String
             let is_public: Bool
         }
-        try await client.from("shared_decks")
-            .update(VisibilityParams(is_public: isPublic))
-            .eq("share_code", value: sanitizedCode)
-            .execute()
+        try await client.rpc("set_deck_visibility", params: VisibilityRPCParams(target_code: sanitizedCode, is_public: isPublic)).execute()
     }
     
     func deleteFromMarket(shareCode: String) async throws {
@@ -337,34 +324,15 @@ class SupabaseManager {
         struct DeleteRPCParams: Encodable {
             let target_code: String
         }
-        do {
-            try await client.rpc("delete_deck", params: DeleteRPCParams(target_code: sanitizedCode)).execute()
-            return
-        } catch {
-            // Kontynuuj do bezpośredniego delete jako fallback
-        }
-        
-        try await client.from("shared_decks")
-            .delete()
-            .eq("share_code", value: sanitizedCode)
-            .execute()
+        try await client.rpc("delete_deck", params: DeleteRPCParams(target_code: sanitizedCode)).execute()
     }
     
     func markDeckAsArchived(shareCode: String) async throws {
         let sanitizedCode = shareCode.normalizedShareCode
-        if let deck = try? await fetchByCode(sanitizedCode) {
-            var updatedTags = deck.tags
-            if !updatedTags.contains("archived") {
-                updatedTags.append("archived")
-            }
-            struct ArchiveParams: Encodable {
-                let tags: [String]
-            }
-            try await client.from("shared_decks")
-                .update(ArchiveParams(tags: updatedTags))
-                .eq("share_code", value: sanitizedCode)
-                .execute()
+        struct ArchiveRPCParams: Encodable {
+            let target_code: String
         }
+        try await client.rpc("archive_deck", params: ArchiveRPCParams(target_code: sanitizedCode)).execute()
     }
 }
 
