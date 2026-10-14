@@ -19,19 +19,19 @@ struct MarkCardIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult {
+        let cId = cardID
+        let known = isKnown
         await MainActor.run {
             let store = FlipItStore()
 
-            // 1. Oznaczamy, że widget był użyty (reset koloru czerwonego)
+            // 1. Oznaczamy, że widget był użyty (reset koloru nieaktywności)
             store.bumpWidgetInteraction()
 
-            // 2. Logika aktualizacji postępu (streak)
-            store.updateStreakAfterWidgetAction(cardIdString: cardID, isKnown: isKnown)
-
-            // 3. Usuwamy zapisaną kartę -> losowanie nowej
+            // 2. Usuwamy stan obrotu, aby kolejna karta pojawiła się przodem
             UserDefaults(suiteName: APP_GROUP_ID)?.removeObject(forKey: "WidgetState")
 
-            store.saveData()
+            // 3. Aktualizacja postępu (streak/box/leitner) — wewnętrznie wykonuje pojedynczy saveData() i przeładowanie widżetu
+            store.updateStreakAfterWidgetAction(cardIdString: cId, isKnown: known)
         }
         return .result()
     }
@@ -52,20 +52,50 @@ struct FlipCardIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult {
+        let cId = cardID
+        let state = flipState
         await MainActor.run {
-            let store = FlipItStore()
+            // Szybki, natychmiastowy zapis w pamięci współdzielonej bez narzutu ładowania całej bazy talii z dysku
+            if let defaults = UserDefaults(suiteName: APP_GROUP_ID) {
+                if let uuid = UUID(uuidString: cId) {
+                    let widgetState = FlipItStore.WidgetState(currentCardId: uuid, isFlipped: state)
+                    if let data = try? JSONEncoder().encode(widgetState) {
+                        defaults.set(data, forKey: "WidgetState")
+                    }
+                }
 
-            // 1. Oznaczamy użycie
-            store.bumpWidgetInteraction()
-
-            if let uuid = UUID(uuidString: cardID) {
-                // 2. Zapisujemy stan obrotu
-                store.saveWidgetState(cardId: uuid, isFlipped: flipState)
+                // Aktualizacja daty użycia widżetu w ustawieniach
+                if let settingsData = defaults.data(forKey: "AppSettings"),
+                   var settings = try? JSONDecoder().decode(AppSettings.self, from: settingsData) {
+                    settings.lastWidgetInteractionDate = Date()
+                    if let updatedData = try? JSONEncoder().encode(settings) {
+                        defaults.set(updatedData, forKey: "AppSettings")
+                    }
+                }
             }
-            // Tu wystarczy reload, bo bumpWidgetInteraction() zapisał już datę w Settings
+
             WidgetCenter.shared.reloadAllTimelines()
         }
         return .result()
+    }
+}
+
+private final class IntentSpeechCoordinator {
+    static let shared = IntentSpeechCoordinator()
+    private let synthesizer = AVSpeechSynthesizer()
+
+    func speak(text: String, language: String) {
+        #if canImport(UIKit)
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.duckOthers])
+        try? AVAudioSession.sharedInstance().setActive(true)
+        #endif
+        if synthesizer.isSpeaking {
+            synthesizer.stopSpeaking(at: .immediate)
+        }
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = AVSpeechSynthesisVoice(language: language)
+        utterance.rate = 0.5
+        synthesizer.speak(utterance)
     }
 }
 
@@ -84,11 +114,7 @@ struct SpeakCardIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        let synthesizer = AVSpeechSynthesizer()
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: language)
-        utterance.rate = 0.5
-        synthesizer.speak(utterance)
+        IntentSpeechCoordinator.shared.speak(text: text, language: language)
         return .result()
     }
 }

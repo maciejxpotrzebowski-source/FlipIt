@@ -281,6 +281,91 @@ struct FlipItTests {
         #expect(result5Wins?.card.front == "Leech")
     }
 
+    @Test("AdaptiveCardSelector maintains continuous Rescue Mode across failures until success")
+    func testAdaptiveSelectorContinuousRescueMode() {
+        let deckId = UUID()
+        let hardCard1 = Flashcard(front: "Hard1", back: "T1", box: 0, correctCount: 0, incorrectCount: 4)
+        let hardCard2 = Flashcard(front: "Hard2", back: "T2", box: 0, correctCount: 1, incorrectCount: 5)
+        let easyCard1 = Flashcard(front: "Easy1", back: "Ł1", box: 3, correctCount: 8, incorrectCount: 1)
+        let easyCard2 = Flashcard(front: "Easy2", back: "Ł2", box: 2, correctCount: 6, incorrectCount: 1)
+
+        let pool = [
+            (card: hardCard1, deckId: deckId),
+            (card: hardCard2, deckId: deckId),
+            (card: easyCard1, deckId: deckId),
+            (card: easyCard2, deckId: deckId)
+        ]
+
+        // 1. Initial selection in rescue mode
+        let result1 = AdaptiveCardSelector.selectNextCard(
+            from: pool,
+            isInRescueMode: true,
+            isInChallengeMode: false,
+            currentCardId: nil,
+            preferredSide: .front
+        )
+        #expect(result1?.reason == .moraleRescue)
+        #expect(result1?.card.box ?? 0 >= 2)
+
+        // 2. Following selection with failure (still in rescue mode, excluding current card)
+        let result2 = AdaptiveCardSelector.selectNextCard(
+            from: pool,
+            isInRescueMode: true,
+            isInChallengeMode: false,
+            currentCardId: result1?.card.id,
+            preferredSide: .front
+        )
+        #expect(result2?.reason == .moraleRescue)
+        #expect(result2?.card.id != result1?.card.id)
+        #expect(result2?.card.box ?? 0 >= 2)
+    }
+
+    @Test("AdaptiveCardSelector maintains continuous Challenge Mode across successes until error")
+    func testAdaptiveSelectorContinuousChallengeMode() {
+        let deckId = UUID()
+        let easyCard = Flashcard(front: "Easy", back: "Łatwe", box: 4, correctCount: 10, incorrectCount: 0)
+        let leechCard1 = Flashcard(front: "Leech1", back: "T1", box: 1, correctCount: 2, incorrectCount: 4)
+        let leechCard2 = Flashcard(front: "Leech2", back: "T2", box: 0, correctCount: 1, incorrectCount: 5)
+
+        let pool = [
+            (card: easyCard, deckId: deckId),
+            (card: leechCard1, deckId: deckId),
+            (card: leechCard2, deckId: deckId)
+        ]
+
+        // 1. Initial selection in challenge mode
+        let result1 = AdaptiveCardSelector.selectNextCard(
+            from: pool,
+            isInRescueMode: false,
+            isInChallengeMode: true,
+            currentCardId: nil,
+            preferredSide: .front
+        )
+        #expect(result1?.reason == .challengeLeech || result1?.reason == .challengeNew)
+        #expect(result1?.card.front.starts(with: "Leech") == true)
+
+        // 2. Continuous challenge: after answering correctly, challenge mode continues and avoids repeating the same card
+        let result2 = AdaptiveCardSelector.selectNextCard(
+            from: pool,
+            isInRescueMode: false,
+            isInChallengeMode: true,
+            currentCardId: result1?.card.id,
+            preferredSide: .front
+        )
+        #expect(result2?.reason == .challengeLeech || result2?.reason == .challengeNew)
+        #expect(result2?.card.id != result1?.card.id)
+        #expect(result2?.card.front.starts(with: "Leech") == true)
+    }
+
+    @Test("AdaptiveCardSelector reasons have no visible badges (silent adaptation)")
+    func testSilentBadges() {
+        #expect(AdaptiveCardSelector.SelectionReason.moraleRescue.displayBadge == nil)
+        #expect(AdaptiveCardSelector.SelectionReason.challengeLeech.displayBadge == nil)
+        #expect(AdaptiveCardSelector.SelectionReason.challengeNew.displayBadge == nil)
+        #expect(AdaptiveCardSelector.SelectionReason.normalDue.displayBadge == nil)
+        #expect(AdaptiveCardSelector.SelectionReason.standardPractice.displayBadge == nil)
+    }
+
     @Test("StudyTelemetry logs events and supports export and clear")
     func testStudyTelemetryLogging() {
         StudyTelemetryManager.shared.clearEvents()

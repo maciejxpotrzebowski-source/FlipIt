@@ -1,68 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct ImportDestinationSheet: View {
-    @ObservedObject var store: FlipItStore
-    @Environment(\.dismiss) var dismiss
-
-    // Callbacki decydujące co robić dalej
-    var onSelectDeck: (UUID) -> Void
-    var onCreateNew: () -> Void
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section(header: Text("Create New")) {
-                    Button(action: {
-                        dismiss()
-                        // Małe opóźnienie, żeby sheet zdążył się zamknąć przed otwarciem kolejnego
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            onCreateNew()
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(.green)
-                            Text("Create New Deck")
-                                .fontWeight(.medium)
-                        }
-                    }
-                }
-
-                Section(header: Text("Add to Existing Deck")) {
-                    if store.decks.isEmpty {
-                        Text("No existing decks.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(store.decks) { deck in
-                            Button(action: {
-                                onSelectDeck(deck.id)
-                                dismiss()
-                            }) {
-                                HStack {
-                                    Text(deck.name)
-                                        .foregroundStyle(.primary)
-                                    Spacer()
-                                    Text("\(deck.cards.count) cards")
-                                        .foregroundStyle(.secondary)
-                                        .font(.caption)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Import to...")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
-        }
-    }
-}
-
-
 struct ImportView: View {
     @ObservedObject var store: FlipItStore
     @Environment(\.dismiss) var dismiss
@@ -74,6 +12,9 @@ struct ImportView: View {
     @State private var showNewDeckSheet = false
     @State private var rawFileCards: [Flashcard] = []
     @State private var importedFileName: String? = nil
+    @State private var importErrorMessage: String? = nil
+    @State private var showImportErrorAlert = false
+    @State private var showDiscardAlert = false
 
     // 1. POPRAWIONY INIT (Domyślnie wybiera pierwszy deck)
     init(store: FlipItStore, initialDeckId: UUID? = nil) {
@@ -101,20 +42,8 @@ struct ImportView: View {
     }
 
     func isDuplicate(_ card: Flashcard) -> Bool {
-            guard let deck = selectedDeck else { return false }
-            return deck.cards.contains { existingCard in
-                // 1. Przygotowanie tekstów (trimowanie spacji)
-                let existingFront = existingCard.front.trimmingCharacters(in: .whitespaces)
-                let existingBack = existingCard.back.trimmingCharacters(in: .whitespaces)
-
-                let newFront = card.front.trimmingCharacters(in: .whitespaces)
-                let newBack = card.back.trimmingCharacters(in: .whitespaces)
-
-                // 2. Porównanie (case-insensitive) OBU stron jednocześnie (AND)
-                return existingFront.localizedCaseInsensitiveCompare(newFront) == .orderedSame &&
-                       existingBack.localizedCaseInsensitiveCompare(newBack) == .orderedSame
-            }
-        }
+        selectedDeck?.containsCard(card) ?? false
+    }
 
     var duplicatesCount: Int {
         return processedFileCards.filter { isDuplicate($0) }.count
@@ -172,12 +101,12 @@ struct ImportView: View {
                     }
 
                     // SEKCJA 2: ŹRÓDŁO I OPCJE
-                    Section(header: Text("Source")) {
+                    Section(header: Text("Source"), footer: Text("Supported formats: CSV, TXT, JSON.")) {
                         Button(action: { showFileImporter = true }) {
                             HStack {
                                 Image(systemName: rawFileCards.isEmpty ? "doc.badge.plus" : "doc.text.fill")
                                     .foregroundStyle(rawFileCards.isEmpty ? .blue : .green)
-                                Text(importedFileName ?? "Select File")
+                                Text(importedFileName ?? "Select File (CSV, TXT, JSON)")
                                             .font(.subheadline)
                                             .fontWeight(.medium)
                                             .foregroundStyle(rawFileCards.isEmpty ? .blue : .green)
@@ -288,7 +217,14 @@ struct ImportView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }.fontWeight(.bold)
+                    Button("Cancel") {
+                        if !rawFileCards.isEmpty {
+                            showDiscardAlert = true
+                        } else {
+                            dismiss()
+                        }
+                    }
+                    .fontWeight(.bold)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Import") {
@@ -303,6 +239,7 @@ struct ImportView: View {
                     .disabled(selectedDeckId == nil || finalCardsToImport.isEmpty)
                 }
             }
+            .interactiveDismissDisabled(!rawFileCards.isEmpty)
             .background(Color.appGroupedBackground)
             .sheet(isPresented: $showNewDeckSheet) {
                 NewDeckSheet(store: store) { newId in self.selectedDeckId = newId }
@@ -320,8 +257,22 @@ struct ImportView: View {
                             self.rawFileCards = store.loadCardsFromURL(url)
                         }
                     case .failure(let error):
-                        print("Error: \(error.localizedDescription)")
+                        self.importErrorMessage = error.localizedDescription
+                        self.showImportErrorAlert = true
                     }
+            }
+            .alert("Import Failed", isPresented: $showImportErrorAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(importErrorMessage ?? "An unknown error occurred while reading the file.")
+            }
+            .alert("Discard Imported Cards?", isPresented: $showDiscardAlert) {
+                Button("Keep Editing", role: .cancel) { }
+                Button("Discard", role: .destructive) {
+                    dismiss()
+                }
+            } message: {
+                Text("The imported cards have not been saved to your deck yet. Are you sure you want to discard them?")
             }
         }
     }

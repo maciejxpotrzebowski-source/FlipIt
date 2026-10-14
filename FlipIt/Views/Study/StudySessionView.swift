@@ -3,11 +3,17 @@ import SwiftUI
 struct StudySessionView: View {
     @ObservedObject var store: FlipItStore
     var selectedDeckIds: [UUID]
-    var onlyUnlearned: Bool
     var studySide: StudySideOption
 
-    // NOWE POLE: Otrzymujemy współczynnik z widoku konfiguracji
-    var learningFactor: LearningFactor
+    init(
+        store: FlipItStore,
+        selectedDeckIds: [UUID],
+        studySide: StudySideOption = .front
+    ) {
+        self.store = store
+        self.selectedDeckIds = selectedDeckIds
+        self.studySide = studySide
+    }
 
     // ... reszta zmiennych stanu bez zmian ...
     @State private var activePool: [(card: Flashcard, deckId: UUID)] = []
@@ -19,10 +25,16 @@ struct StudySessionView: View {
     @State private var sessionReviewCount = 0
     @State private var sessionKnownCount = 0
 
-    // Adaptive Learning State (Casino Morale & Challenge Engine)
+    // Adaptive Learning State (Silent Continuous DDA Engine)
     @State private var consecutiveFailures = 0
     @State private var consecutiveSuccesses = 0
+    @State private var isInRescueMode = false
+    @State private var isInChallengeMode = false
     @State private var currentReason: AdaptiveCardSelector.SelectionReason = .normalDue
+
+    // Haptic Feedback State for Card Dragging
+    @State private var hasTriggeredDragStartHaptic = false
+    @State private var hasTriggeredThresholdHaptic = false
 
     var body: some View {
         VStack {
@@ -38,35 +50,19 @@ struct StudySessionView: View {
                 }
             } else if let item = currentItem {
 
-                // --- TOP STATS & ADAPTIVE BADGE ---
-                VStack(spacing: 8) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Session Known: \(sessionKnownCount)")
-                            Text("Reviewed: \(sessionReviewCount)")
-                        }
-                        .font(.caption)
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 4) {
-                            Text("Cards in pool: \(activePool.count)")
-                            Text("Mastered: \(activePool.filter { $0.card.isLearned }.count)")
-                        }
-                        .font(.caption)
+                // --- TOP STATS ---
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Session Known: \(sessionKnownCount)")
+                        Text("Reviewed: \(sessionReviewCount)")
                     }
-
-                    // Adaptive Morale / Challenge Badge
-                    if let badge = currentReason.displayBadge {
-                        HStack {
-                            Text(badge)
-                                .font(.caption2)
-                                .fontWeight(.bold)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(currentReason == .moraleRescue ? Color.orange.opacity(0.18) : Color.purple.opacity(0.18))
-                                .foregroundStyle(currentReason == .moraleRescue ? Color.orange : Color.purple)
-                                .clipShape(Capsule())
-                        }
+                    .font(.caption)
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Cards in pool: \(activePool.count)")
+                        Text("Mastered: \(activePool.filter { $0.card.isLearned }.count)")
                     }
+                    .font(.caption)
                 }
                 .padding(.horizontal)
                 .padding(.top, 4)
@@ -118,8 +114,35 @@ struct StudySessionView: View {
                 .offset(x: dragOffset.width, y: dragOffset.height * 0.4)
                 .gesture(
                     DragGesture()
-                        .onChanged { gesture in dragOffset = gesture.translation }
+                        .onChanged { gesture in
+                            dragOffset = gesture.translation
+
+                            #if canImport(UIKit)
+                            let translationX = gesture.translation.width
+
+                            // Krótka haptyka przy rozpoczęciu przesuwania fiszki w lewo lub w prawo
+                            if !hasTriggeredDragStartHaptic && abs(translationX) > 10 {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                hasTriggeredDragStartHaptic = true
+                            } else if hasTriggeredDragStartHaptic && abs(translationX) < 5 {
+                                hasTriggeredDragStartHaptic = false
+                            }
+
+                            // Haptyczny przeskok przy osiągnięciu progu decyzji (100 px)
+                            if !hasTriggeredThresholdHaptic && abs(translationX) >= 100 {
+                                UISelectionFeedbackGenerator().selectionChanged()
+                                hasTriggeredThresholdHaptic = true
+                            } else if hasTriggeredThresholdHaptic && abs(translationX) < 85 {
+                                hasTriggeredThresholdHaptic = false
+                            }
+                            #endif
+                        }
                         .onEnded { gesture in
+                            #if canImport(UIKit)
+                            hasTriggeredDragStartHaptic = false
+                            hasTriggeredThresholdHaptic = false
+                            #endif
+
                             if gesture.translation.width > 100 { swipeRight() }
                             else if gesture.translation.width < -100 { swipeLeft() }
                             else { withAnimation(.spring()) { dragOffset = .zero } }
@@ -139,14 +162,19 @@ struct StudySessionView: View {
                         Image(systemName: "xmark").font(.system(size: 30, weight: .bold))
                             .frame(width: 70, height: 70).background(Color.red.opacity(0.9)).foregroundStyle(.white).clipShape(Circle())
                     }
+                    .accessibilityLabel("Still learning")
+
                     Button(action: { withAnimation { isFlipped.toggle() } }) {
                         Image(systemName: "arrow.triangle.2.circlepath").font(.system(size: 25, weight: .bold))
                             .frame(width: 60, height: 60).background(Color.blue).foregroundStyle(.white).clipShape(Circle())
                     }
+                    .accessibilityLabel("Flip card")
+
                     Button(action: swipeRight) {
                         Image(systemName: "checkmark").font(.system(size: 30, weight: .bold))
                             .frame(width: 70, height: 70).background(Color.green.opacity(0.9)).foregroundStyle(.white).clipShape(Circle())
                     }
+                    .accessibilityLabel("Know")
                 }
                 .padding(.bottom, 40)
             }
@@ -167,7 +195,6 @@ struct StudySessionView: View {
         var newPool: [(card: Flashcard, deckId: UUID)] = []
         for deck in store.decks where selectedDeckIds.contains(deck.id) {
             for card in deck.cards {
-                if onlyUnlearned && card.isLearned { continue }
                 newPool.append((card, deck.id))
             }
         }
@@ -182,11 +209,12 @@ struct StudySessionView: View {
             return
         }
 
-        // Używamy inteligentnego AdaptiveCardSelector z mechaniką Morale i Challenge
+        // Używamy inteligentnego AdaptiveCardSelector z dynamicznym balansem trudności (DDA)
         if let result = AdaptiveCardSelector.selectNextCard(
             from: activePool,
-            consecutiveFailures: consecutiveFailures,
-            consecutiveSuccesses: consecutiveSuccesses,
+            isInRescueMode: isInRescueMode,
+            isInChallengeMode: isInChallengeMode,
+            currentCardId: currentItem?.card.id,
             preferredSide: studySide
         ) {
             currentItem = (result.card, result.deckId)
@@ -194,11 +222,6 @@ struct StudySessionView: View {
             isFrontFirst = !result.reverseSide
             isFlipped = false
             dragOffset = .zero
-
-            // Zmniejsz licznik serii sukcesów po zaserwowaniu wyzwania, by nie bombardować trudnymi kartami
-            if result.reason == .challengeLeech || result.reason == .challengeNew {
-                consecutiveSuccesses = 0
-            }
         } else {
             currentItem = activePool.first
             currentReason = .normalDue
@@ -214,13 +237,25 @@ struct StudySessionView: View {
         let wasMorale = (currentReason == .moraleRescue)
         let wasChallenge = (currentReason == .challengeLeech || currentReason == .challengeNew)
 
-        // Aktualizacja serii dla mechaniki kasyna / morale / wyzwania
+        // Aktualizacja serii i stanów DDA (Dynamic Difficulty Adjustment)
         if isKnown {
             consecutiveSuccesses += 1
             consecutiveFailures = 0
+            // Sukces kończy tryb ratunkowy morale
+            isInRescueMode = false
+            // Seria >= 3 sukcesów lub udana odpowiedź w trybie wyzwania kontynuuje trudniejsze fiszki
+            if consecutiveSuccesses >= 3 || isInChallengeMode {
+                isInChallengeMode = true
+            }
         } else {
             consecutiveFailures += 1
             consecutiveSuccesses = 0
+            // Błąd natychmiast przerywa tryb wyzwania
+            isInChallengeMode = false
+            // Błędy (>= 2) lub błąd podczas trwającego trybu ratunkowego utrzymują łatwiejsze fiszki aż do poprawnej odpowiedzi
+            if consecutiveFailures >= 2 || isInRescueMode {
+                isInRescueMode = true
+            }
         }
 
         if let index = activePool.firstIndex(where: { $0.card.id == item.card.id }) {
@@ -255,6 +290,9 @@ struct StudySessionView: View {
     }
 
     func swipeRight() {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #endif
         withAnimation(.easeOut(duration: AnimationConfig.flyInDuration)) {
             dragOffset.width = 1000
         }
@@ -270,6 +308,9 @@ struct StudySessionView: View {
     }
 
     func swipeLeft() {
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #endif
         withAnimation(.easeOut(duration: AnimationConfig.flyInDuration)) { dragOffset.width = -1000 }
         DispatchQueue.main.asyncAfter(deadline: .now() + AnimationConfig.nextCardDelay) {
             updateCurrentCard(isKnown: false)

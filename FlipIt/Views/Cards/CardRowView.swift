@@ -10,8 +10,13 @@ struct CardRowView: View {
 
     @State private var showDeleteConfirmation = false
     @State private var showEditSheet = false
+    @State private var showDiscardCardAlert = false
     @State private var tempFront = ""
     @State private var tempBack = ""
+
+    private var hasCardChanges: Bool {
+        tempFront != card.front || tempBack != card.back
+    }
 
     private var badgeColor: Color {
         if card.isLearned {
@@ -115,14 +120,31 @@ struct CardRowView: View {
                                     }
                                 }
                 .navigationTitle("Edit Card")
+                .interactiveDismissDisabled(hasCardChanges)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showEditSheet = false } }
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            if hasCardChanges {
+                                showDiscardCardAlert = true
+                            } else {
+                                showEditSheet = false
+                            }
+                        }
+                    }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Save") {
                             store.updateCardContent(deckId: deck.id, cardId: card.id, front: tempFront, back: tempBack)
                             showEditSheet = false
                         }
                     }
+                }
+                .alert("Discard Changes?", isPresented: $showDiscardCardAlert) {
+                    Button("Keep Editing", role: .cancel) { }
+                    Button("Discard Changes", role: .destructive) {
+                        showEditSheet = false
+                    }
+                } message: {
+                    Text("You have unsaved changes. Are you sure you want to discard them?")
                 }
             }
             .presentationDetents([.medium])

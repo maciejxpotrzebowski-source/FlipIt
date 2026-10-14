@@ -84,16 +84,16 @@ struct Flashcard: Identifiable, Codable, Equatable {
 - Poprawna odpowiedź (✓): `box = min(box + 1, 4)`
 - Błędna odpowiedź (❌): `box = max(box - 1, 0)` (**karta cofa się o 1 poziom, a nie spada do zera!**)
 
-### D. Dynamic Flow Controller (`AdaptiveCardSelector`)
-Algorytm monitoruje przebieg sesji i reaguje na skrajne stany:
+### D. Dynamic Flow Controller (`AdaptiveCardSelector` & Silent Continuous DDA)
+Algorytm monitoruje przebieg sesji i reaguje na skrajne stany całkowicie dyskretnie w tle (bez rozpraszających etykiet/odznak):
 1. **Koło Ratunkowe (Morale Rescue):**
-   - **Warunek:** $\ge 3$ błędy z rzędu (`consecutiveFailures >= 3`).
-   - **Działanie:** Podsuwa kartę łatwą/opanowaną (`box >= 2` lub skuteczność $> 75\%$).
-   - **Efekt:** Etykieta `✨ Doładowanie morale`, natychmiastowe przełamanie passy, wyrzut dopaminy, ochrona przed zniechęceniem.
+   - **Warunek:** $\ge 2$ błędy z rzędu lub trwający tryb ratunkowy (`isInRescueMode`).
+   - **Działanie:** Podsuwa różnorodne łatwiejsze karty z wyższych pudełek (`box >= 2` lub skuteczność $\ge 70\%$, z wyłączeniem ostatniej karty).
+   - **Ciągłość:** W razie kolejnych błędów tryb ratunkowy **nie resetuje się** — łatwiejsze pytania trwają nieprzerwanie aż do pierwszej poprawnej odpowiedzi.
 2. **Podkręcenie Poprzeczki (Challenge Engine):**
-   - **Warunek:** $\ge 5$ sukcesów z rzędu (`consecutiveSuccesses >= 5`).
-   - **Działanie:** Podsuwa „pijawkę” (trudne słówko) lub nową kartę, ewentualnie odwraca kolejność pytania (aktywna produkcja).
-   - **Efekt:** Etykieta `🔥 Wyzwanie` lub `🌱 Nowe słówko`, ochrona przed nudą i automatycznym klikaniem.
+   - **Warunek:** $\ge 3$ sukcesy z rzędu lub trwający tryb wyzwania (`isInChallengeMode`).
+   - **Działanie:** Podsuwa „pijawkę” (trudne słówko), kartę z niskiego pudełka/nową lub odwraca kolejność pytania (aktywna produkcja).
+   - **Ciągłość:** Po poprawnej odpowiedzi na trudniejsze pytanie system **kontynuuje serwowanie trudniejszych fiszek** tak długo, jak użytkownik odpowiada poprawnie. Pojedynczy błąd natychmiast wyłącza wyzwanie.
 3. **Tryb Standardowy:**
    - Wybiera karty przeterminowane (`nextReviewDate <= now`), z priorytetem dla najniższych pudełek (Pudełko 0 > 1 > 2...).
 
@@ -126,14 +126,18 @@ FlipIt/
 │   │   ├── CardRowView.swift       # Wiersz karty w liście (znaczek opanowania ✓ / box)
 │   │   └── AddCardSheet.swift      # Dodawanie nowej karty z limitem znaków
 │   ├── Study/
-│   │   ├── StudySetupView.swift    # Konfiguracja sesji (wybór stron, talii)
-│   │   └── StudySessionView.swift  # Aktywna nauka (swipe Tinder-style, obrót 3D, badges)
+│   │   └── StudySessionView.swift  # Aktywna nauka (swipe Tinder-style, obrót 3D, badges) uruchamiana wprost z HomeView
+│   ├── Market/
+│   │   ├── DeckMarketView.swift    # Giełda Decków (Oficjalne / Społeczność / Szukaj po kodzie 8-znakowym)
+│   │   └── PublishDeckSheet.swift  # Publikacja talii na giełdzie (kod auto-generowany, opcja prywatna)
 │   ├── Settings/
 │   │   └── SettingsView.swift      # Ustawienia języków, widgetu, FlipIt Pro i Telemetrii
 │   ├── AI/
 │   │   └── AIGenerateView.swift    # Generowanie kart przez Gemini z paywallem Pro
 │   ├── Import/
 │   │   └── ImportView.swift        # Import z plików CSV / JSON
+│   ├── Services/
+│   │   └── SupabaseManager.swift   # Klient Supabase (REST API, RPC, publikowanie, pobieranie po kodzie)
 │   └── Components/
 │       ├── SpeakerButton.swift     # Synteza mowy (AVSpeechSynthesizer, Dark Mode)
 │       ├── MoveCardsView.swift     # Przenoszenie kart między taliami
@@ -145,8 +149,8 @@ FlipIt/
 │   └── FlipItWidget.swift          # Widgety iOS 17 (Study & Add, FlipIt Minimal) z Leitnerem
 ├── FlipItTests/
 │   └── FlipItTests.swift           # 13 testów jednostkowych (Leitner, Telemetria, Parsowanie)
-├── en.lproj/Localizable.strings    # Tłumaczenia angielskie (~155 kluczy)
-└── pl.lproj/Localizable.strings    # Tłumaczenia polskie (~155 kluczy)
+├── en.lproj/Localizable.strings    # Tłumaczenia angielskie (~170 kluczy)
+└── pl.lproj/Localizable.strings    # Tłumaczenia polskie (~170 kluczy)
 ```
 
 ---
@@ -160,11 +164,12 @@ FlipIt/
 ---
 
 ## 6. 📋 Zadania w Backlogu (Kolejne Kroki)
-Jeśli będziesz chciał rozwijać aplikację dalej na nowym komputerze, oto rekomendowane zadania:
-1. **Wyszukiwarka kart i talii:** Dodanie `.searchable(text:)` w `HomeView` i `DeckDetailView`.
-2. **Uproszczenie menu DeckDetailView:** Przeniesienie rzadkich operacji (usuń duplikaty, usuń nauczone) do podmenu lub dedykowanego arkusza „Zarządzanie talią”.
-3. **Komponent `CharacterCountLabel`:** Wyekstrahowanie powtarzającego się kodu liczników znaków.
-4. **Haptic Feedback:** Dopisanie `UIImpactFeedbackGenerator` przy gestach swipe (sukces/błąd) oraz kliknięciu obrotu karty.
+1. **Synchronizacja wielourządzeniowa (iCloud Sync / CloudKit):** Wdrożenie modularnej synchronizacji talii i postępów w chmurze (wymaga Apple Developer Program / płatnego konta z capability iCloud Documents lub CloudKit).
+2. **Bufor wyprzedzający widżetu (Prefetching Queue):** Kolejkowanie 3–5 fiszek do przodu w widżecie z asynchronicznym rejestrowaniem odpowiedzi (Action Queue) w celu natychmiastowej responsywności.
+3. **Wyszukiwarka kart i talii:** Dodanie `.searchable(text:)` w `HomeView` i `DeckDetailView`.
+4. **Uproszczenie menu DeckDetailView:** Przeniesienie rzadkich operacji (usuń duplikaty, usuń nauczone) do podmenu lub dedykowanego arkusza „Zarządzanie talią”.
+5. **Komponent `CharacterCountLabel`:** Wyekstrahowanie powtarzającego się kodu liczników znaków.
+6. **Rozbudowa haptyki:** Dodanie haptyki przy obrocie karty i zakończeniu sesji według propozycji.
 
 ---
 

@@ -19,3 +19,7 @@ FlipIt/Config.xcconfig
 *.ipa
 *.dSYM.zip
 *.dSYM
+
+# Assets / Notes
+LOGO.xlsx
+

@@ -33,6 +33,11 @@ extension Color {
         return Color.white
         #endif
     }
+
+    /// Żółtopomarańczowy odcień dla powiadomień o aktualizacjach talii z giełdy
+    static var marketUpdateYellowOrange: Color {
+        return Color(red: 1.0, green: 0.65, blue: 0.0)
+    }
 }
 
 extension View {
@@ -73,17 +78,21 @@ extension ToolbarItemPlacement {
     }
 }
 
-#if !os(iOS)
-public enum NavigationBarItemTitleDisplayModePlaceholder {
-    case automatic, inline, large
-}
+extension String {
+    /// Czyści i normalizuje kod udostępniania (usuwa myślniki, spacje, zamienia na wielkie litery)
+    var normalizedShareCode: String {
+        self.replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: " ", with: "")
+            .uppercased()
+    }
 
-extension View {
-    public func navigationBarTitleDisplayMode(_ displayMode: NavigationBarItemTitleDisplayModePlaceholder) -> some View {
-        self
+    /// Normalizuje klucz fiszki do porównywania duplikatów i synchronizacji
+    var normalizedCardKey: String {
+        self.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 }
-#endif
+
+
 
 struct AppLimits {
     static let deckName = 40
@@ -148,6 +157,8 @@ let availableLanguages: [String: String] = [
     "ar-SA": "Arabic",
     "he-IL": "Hebrew"
 ]
+
+let availableCEFRLevels: [String] = ["A1", "A2", "B1", "B2", "C1", "C2"]
 
 func getLangCode(_ code: String) -> String {
     return String(code.prefix(2)).uppercased()
@@ -289,23 +300,7 @@ struct Flashcard: Identifiable, Codable, Equatable {
     }
 }
 
-enum LearningFactor: Double, Codable, CaseIterable {
-    case veryFrequent = 0.25
-    case frequent = 0.5
-    case standard = 1.0
-    case rare = 2.0
-    case veryRare = 4.0
 
-    var label: String {
-        switch self {
-        case .veryFrequent: return "Very Frequent"
-        case .frequent:     return "Frequent"
-        case .standard:     return "Standard"
-        case .rare:         return "Rare"
-        case .veryRare:     return "Very Rare"
-        }
-    }
-}
 
 struct Deck: Identifiable, Codable, Equatable {
     var id = UUID()
@@ -320,14 +315,78 @@ struct Deck: Identifiable, Codable, Equatable {
 
     var cards: [Flashcard]
 
+    /// Kod giełdowy (8-znakowy) — ustawiony jeśli deck pochodzi z Giełdy Decków
+    var shareCode: String?
+
+    /// Czy użytkownik tego urządzenia jest autorem opublikowanego decku
+    var isMarketAuthor: Bool = false
+
+    /// Czy deck jest publiczny na giełdzie, czy prywatny (dostępny tylko dla znajomych z kodem)
+    var isMarketPublic: Bool = true
+
+    /// Wersja pobranego/opublikowanego decku
+    var marketVersion: Int = 1
+
+    /// Czy deck ma oczekującą aktualizację z giełdy (opublikowaną przez autora)
+    var hasPendingMarketUpdate: Bool = false
+
+    /// Ostatnio zsynchronizowany lub odrzucony identyfikator wersji (updated_at)
+    var lastDismissedUpdateDate: String? = nil
+
+    /// Poziom językowy talii (np. A1, A2, B1, B2, C1, C2)
+    var difficultyLevel: String? = nil
+
+    /// Snapshot kart pobranych z giełdy (do precyzyjnego diffu 3-stronnego)
+    var syncedMarketCards: [SharedCard]? = nil
+
     var progress: Double {
         if cards.isEmpty { return 0.0 }
         let learnedCount = cards.filter { $0.isLearned }.count
         return Double(learnedCount) / Double(cards.count)
     }
 
+    /// Postęp ważony koszykami Leitnera (Box 0 = 0%, Box 1 = 25%, Box 2 = 50%, Box 3 = 75%, Box 4 = 100%)
+    var leitnerProgress: Double {
+        if cards.isEmpty { return 0.0 }
+        let totalScore = cards.reduce(0) { $0 + min(max($1.box, 0), 4) }
+        let maxScore = cards.count * 4
+        return Double(totalScore) / Double(maxScore)
+    }
+
+    /// Czy 100% fiszek znajduje się w najwyższym koszyku (Box 4)
+    var isMastered: Bool {
+        !cards.isEmpty && cards.allSatisfy { $0.box >= 4 }
+    }
+
+    /// Kod giełdowy sformatowany jako XXXX-XXXX
+    var formattedCode: String {
+        guard let code = shareCode else { return "" }
+        if code.count == 8 {
+            let idx = code.index(code.startIndex, offsetBy: 4)
+            return "\(code[..<idx])-\(code[idx...])"
+        }
+        return code
+    }
+
     // Zaktualizowany inicjalizator
-    init(id: UUID = UUID(), name: String, description: String = "", frontLabel: String = "Front", backLabel: String = "Back", frontLanguage: String = "en-US", backLanguage: String = "pl-PL", cards: [Flashcard]) {
+    init(
+        id: UUID = UUID(),
+        name: String,
+        description: String = "",
+        frontLabel: String = "Front",
+        backLabel: String = "Back",
+        frontLanguage: String = "en-US",
+        backLanguage: String = "pl-PL",
+        cards: [Flashcard],
+        shareCode: String? = nil,
+        isMarketAuthor: Bool = false,
+        isMarketPublic: Bool = true,
+        marketVersion: Int = 1,
+        hasPendingMarketUpdate: Bool = false,
+        lastDismissedUpdateDate: String? = nil,
+        difficultyLevel: String? = nil,
+        syncedMarketCards: [SharedCard]? = nil
+    ) {
         self.id = id
         self.name = name
         self.description = description
@@ -336,10 +395,18 @@ struct Deck: Identifiable, Codable, Equatable {
         self.frontLanguage = frontLanguage
         self.backLanguage = backLanguage
         self.cards = cards
+        self.shareCode = shareCode
+        self.isMarketAuthor = isMarketAuthor
+        self.isMarketPublic = isMarketPublic
+        self.marketVersion = marketVersion
+        self.hasPendingMarketUpdate = hasPendingMarketUpdate
+        self.lastDismissedUpdateDate = lastDismissedUpdateDate
+        self.difficultyLevel = difficultyLevel
+        self.syncedMarketCards = syncedMarketCards
     }
 
     // Zaktualizowane dekodowanie (dla kompatybilności wstecznej)
-    init(from decoder: Decoder) throws {
+    nonisolated init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
@@ -351,8 +418,220 @@ struct Deck: Identifiable, Codable, Equatable {
         // Dekodowanie z wartością domyślną dla starszych danych
         frontLanguage = try container.decodeIfPresent(String.self, forKey: .frontLanguage) ?? "en-US"
         backLanguage = try container.decodeIfPresent(String.self, forKey: .backLanguage) ?? "pl-PL"
+
+        // Kod giełdowy (opcjonalny, nil dla lokalnych decków)
+        shareCode = try container.decodeIfPresent(String.self, forKey: .shareCode)
+        isMarketAuthor = try container.decodeIfPresent(Bool.self, forKey: .isMarketAuthor) ?? (shareCode != nil)
+        isMarketPublic = try container.decodeIfPresent(Bool.self, forKey: .isMarketPublic) ?? true
+        marketVersion = try container.decodeIfPresent(Int.self, forKey: .marketVersion) ?? 1
+        hasPendingMarketUpdate = try container.decodeIfPresent(Bool.self, forKey: .hasPendingMarketUpdate) ?? false
+        lastDismissedUpdateDate = try container.decodeIfPresent(String.self, forKey: .lastDismissedUpdateDate)
+        difficultyLevel = try container.decodeIfPresent(String.self, forKey: .difficultyLevel)
+        syncedMarketCards = try container.decodeIfPresent([SharedCard].self, forKey: .syncedMarketCards)
+    }
+
+    /// Sprawdza, czy talia zawiera już fiszkę o takich samych wartościach awersu i rewersu
+    func containsCard(front: String, back: String) -> Bool {
+        let trimmedFront = front.trimmingCharacters(in: .whitespaces)
+        let trimmedBack = back.trimmingCharacters(in: .whitespaces)
+        return cards.contains { existing in
+            existing.front.trimmingCharacters(in: .whitespaces).localizedCaseInsensitiveCompare(trimmedFront) == .orderedSame &&
+            existing.back.trimmingCharacters(in: .whitespaces).localizedCaseInsensitiveCompare(trimmedBack) == .orderedSame
+        }
+    }
+
+    func containsCard(_ card: Flashcard) -> Bool {
+        containsCard(front: card.front, back: card.back)
     }
 }
+
+// 5 Stanów Pochodzenia Talii
+enum DeckMarketType: Equatable {
+    case localPrivate                     // 1. Prywatna talia użytkownika (brak ikony)
+    case ownPublic                        // 2. Własna talia udostępniona publicznie na giełdzie
+    case ownPrivate                       // 3. Własna talia udostępniona prywatnie (znajomi z kodem)
+    case importedPublic(hasUpdate: Bool)  // 4. Talia zaimportowana z giełdy publicznej
+    case importedPrivate(hasUpdate: Bool) // 5. Talia zaimportowana prywatnie (od znajomego)
+}
+
+extension Deck {
+    var marketType: DeckMarketType {
+        guard shareCode != nil else {
+            return .localPrivate
+        }
+        if isMarketAuthor {
+            return isMarketPublic ? .ownPublic : .ownPrivate
+        } else {
+            return isMarketPublic
+                ? .importedPublic(hasUpdate: hasPendingMarketUpdate)
+                : .importedPrivate(hasUpdate: hasPendingMarketUpdate)
+        }
+    }
+}
+
+// --- SHARED MARKET MODELS ---
+
+struct SharedCard: Codable, Sendable, Equatable {
+    let front: String
+    let back: String
+}
+
+struct SharedDeck: Codable, Identifiable, Sendable {
+    let id: UUID
+    let shareCode: String
+    let title: String
+    let description: String
+    let frontLabel: String
+    let backLabel: String
+    let frontLanguage: String
+    let backLanguage: String
+    let cardsCount: Int
+    let cardsPayload: [SharedCard]
+    let isOfficial: Bool
+    let isPublic: Bool
+    let authorName: String
+    let tags: [String]
+    let difficultyLevel: String?
+    let downloadsCount: Int
+    let totalReviewsReported: Int
+    let totalUsersReported: Int
+    let returnUsersReported: Int?
+    let createdAt: String?
+    let updatedAt: String?
+    let authorId: UUID?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case shareCode = "share_code"
+        case title
+        case description
+        case frontLabel = "front_label"
+        case backLabel = "back_label"
+        case frontLanguage = "front_language"
+        case backLanguage = "back_language"
+        case cardsCount = "cards_count"
+        case cardsPayload = "cards_payload"
+        case isOfficial = "is_official"
+        case isPublic = "is_public"
+        case authorName = "author_name"
+        case tags
+        case difficultyLevel = "difficulty_level"
+        case downloadsCount = "downloads_count"
+        case totalReviewsReported = "total_reviews_reported"
+        case totalUsersReported = "total_users_reported"
+        case returnUsersReported = "return_users_reported"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case authorId = "author_id"
+    }
+
+    nonisolated init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        shareCode = try c.decode(String.self, forKey: .shareCode)
+        title = try c.decode(String.self, forKey: .title)
+        description = try c.decodeIfPresent(String.self, forKey: .description) ?? ""
+        frontLabel = try c.decodeIfPresent(String.self, forKey: .frontLabel) ?? "Front"
+        backLabel = try c.decodeIfPresent(String.self, forKey: .backLabel) ?? "Back"
+        frontLanguage = try c.decodeIfPresent(String.self, forKey: .frontLanguage) ?? "en-US"
+        backLanguage = try c.decodeIfPresent(String.self, forKey: .backLanguage) ?? "pl-PL"
+        cardsCount = try c.decodeIfPresent(Int.self, forKey: .cardsCount) ?? 0
+        cardsPayload = try c.decodeIfPresent([SharedCard].self, forKey: .cardsPayload) ?? []
+        isOfficial = try c.decodeIfPresent(Bool.self, forKey: .isOfficial) ?? false
+        isPublic = try c.decodeIfPresent(Bool.self, forKey: .isPublic) ?? true
+        authorName = try c.decodeIfPresent(String.self, forKey: .authorName) ?? "Anonymous"
+        tags = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
+        difficultyLevel = try c.decodeIfPresent(String.self, forKey: .difficultyLevel)
+        downloadsCount = try c.decodeIfPresent(Int.self, forKey: .downloadsCount) ?? 0
+        totalReviewsReported = try c.decodeIfPresent(Int.self, forKey: .totalReviewsReported) ?? 0
+        totalUsersReported = try c.decodeIfPresent(Int.self, forKey: .totalUsersReported) ?? 0
+        returnUsersReported = try c.decodeIfPresent(Int.self, forKey: .returnUsersReported) ?? 0
+        createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
+        authorId = try c.decodeIfPresent(UUID.self, forKey: .authorId)
+    }
+    
+    init(
+        id: UUID = UUID(),
+        shareCode: String,
+        title: String,
+        description: String = "",
+        frontLabel: String = "Front",
+        backLabel: String = "Back",
+        frontLanguage: String = "en-US",
+        backLanguage: String = "pl-PL",
+        cardsCount: Int = 0,
+        cardsPayload: [SharedCard] = [],
+        isOfficial: Bool = false,
+        isPublic: Bool = true,
+        authorName: String = "Anonymous",
+        tags: [String] = [],
+        difficultyLevel: String? = nil,
+        downloadsCount: Int = 0,
+        totalReviewsReported: Int = 0,
+        totalUsersReported: Int = 0,
+        returnUsersReported: Int? = 0,
+        createdAt: String? = nil,
+        updatedAt: String? = nil,
+        authorId: UUID? = nil
+    ) {
+        self.id = id
+        self.shareCode = shareCode
+        self.title = title
+        self.description = description
+        self.frontLabel = frontLabel
+        self.backLabel = backLabel
+        self.frontLanguage = frontLanguage
+        self.backLanguage = backLanguage
+        self.cardsCount = cardsCount
+        self.cardsPayload = cardsPayload
+        self.isOfficial = isOfficial
+        self.isPublic = isPublic
+        self.authorName = authorName
+        self.tags = tags
+        self.difficultyLevel = difficultyLevel
+        self.downloadsCount = downloadsCount
+        self.totalReviewsReported = totalReviewsReported
+        self.totalUsersReported = totalUsersReported
+        self.returnUsersReported = returnUsersReported
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.authorId = authorId
+    }
+    
+    var avgReviewsPerUser: Double {
+        guard totalUsersReported > 0 else { return 0 }
+        return Double(totalReviewsReported) / Double(totalUsersReported)
+    }
+
+    /// Wskaźnik powracalności (odsetek osób, które uczyły się w więcej niż 1 dniu)
+    var returnRatePercentage: Int? {
+        guard let returns = returnUsersReported, returns > 0, totalUsersReported > 0 else { return nil }
+        let rate = Double(returns) / Double(max(downloadsCount, returns))
+        return min(max(Int(rate * 100), 1), 100)
+    }
+
+    /// Poziom języka do wyświetlenia (np. B2, A1)
+    var displayLevel: String? {
+        guard let level = difficultyLevel, !level.isEmpty, level.lowercased() != "general" else { return nil }
+        return level.uppercased()
+    }
+    
+    /// Czy talia została oznaczona jako archiwalna przez autora
+    var isArchived: Bool {
+        tags.contains("archived")
+    }
+    
+    /// Kod sformatowany jako XXXX-XXXX
+    var formattedCode: String {
+        if shareCode.count == 8 {
+            let idx = shareCode.index(shareCode.startIndex, offsetBy: 4)
+            return "\(shareCode[..<idx])-\(shareCode[idx...])"
+        }
+        return shareCode
+    }
+}
+
 enum CardSortOption: String, Codable, CaseIterable {
     case frontAZ = "Front (A-Z)"
     case frontZA = "Front (Z-A)"
@@ -368,6 +647,63 @@ enum StudySideOption: String, Codable, CaseIterable {
     case front = "Front First"
     case back = "Back First"
     case random = "Random Mix"
+}
+
+enum GeminiModelOption: String, Codable, CaseIterable, Identifiable {
+    case flash3 = "models/gemini-3-flash-preview"
+    case flash31Lite = "models/gemini-3.1-flash-lite"
+    case flash35Lite = "models/gemini-3.5-flash-lite"
+    case flash38 = "models/gemini-3.8-flash"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .flash3:
+            return "AI 3 Flash"
+        case .flash31Lite:
+            return "AI 3.1 Flash-Lite (Recommended)"
+        case .flash35Lite:
+            return "AI 3.5 Flash-Lite"
+        case .flash38:
+            return "AI 3.8 Flash"
+        }
+    }
+
+    var speedBadge: String {
+        switch self {
+        case .flash31Lite, .flash35Lite:
+            return "Ultra Fast (~1.5s)"
+        case .flash3, .flash38:
+            return "Fast (~2.5s)"
+        }
+    }
+
+    var dailyLimitText: String {
+        "1,500 req/day (Free Tier)"
+    }
+
+    var badgeColor: Color {
+        switch self {
+        case .flash3:
+            return .purple
+        case .flash31Lite:
+            return .blue
+        case .flash35Lite:
+            return .green
+        case .flash38:
+            return .orange
+        }
+    }
+
+    var estimatedTime100Cards: String {
+        switch self {
+        case .flash31Lite, .flash35Lite:
+            return "~1.5 – 2.5s"
+        case .flash3, .flash38:
+            return "~2.5 – 4.0s"
+        }
+    }
 }
 
 struct AppSettings: Codable {
@@ -389,6 +725,7 @@ struct AppSettings: Codable {
     var defaultBackLanguage: String = "pl-PL"
     var isPremiumUser: Bool = false
     var analyticsEnabled: Bool = false // Anonimowa telemetria uczenia
+    var geminiModel: GeminiModelOption = .flash31Lite
 
     init(
         confirmDelete: Bool = true,
@@ -405,7 +742,8 @@ struct AppSettings: Codable {
         defaultFrontLanguage: String = "en-US",
         defaultBackLanguage: String = "pl-PL",
         isPremiumUser: Bool = false,
-        analyticsEnabled: Bool = false
+        analyticsEnabled: Bool = false,
+        geminiModel: GeminiModelOption = .flash31Lite
     ) {
         self.confirmDelete = confirmDelete
         self.sortOption = sortOption
@@ -422,6 +760,7 @@ struct AppSettings: Codable {
         self.defaultBackLanguage = defaultBackLanguage
         self.isPremiumUser = isPremiumUser
         self.analyticsEnabled = analyticsEnabled
+        self.geminiModel = geminiModel
     }
 
     init(from decoder: Decoder) throws {
@@ -440,7 +779,12 @@ struct AppSettings: Codable {
         defaultFrontLanguage = try container.decodeIfPresent(String.self, forKey: .defaultFrontLanguage) ?? "en-US"
         defaultBackLanguage = try container.decodeIfPresent(String.self, forKey: .defaultBackLanguage) ?? "pl-PL"
         isPremiumUser = try container.decodeIfPresent(Bool.self, forKey: .isPremiumUser) ?? false
-        analyticsEnabled = try container.decodeIfPresent(Bool.self, forKey: .analyticsEnabled) ?? false
+        if let raw = try? container.decodeIfPresent(String.self, forKey: .geminiModel),
+           let model = GeminiModelOption(rawValue: raw) {
+            geminiModel = model
+        } else {
+            geminiModel = .flash31Lite
+        }
     }
 }
 
@@ -542,12 +886,8 @@ struct AdaptiveCardSelector {
         case standardPractice
 
         var displayBadge: String? {
-            switch self {
-            case .moraleRescue: return "✨ Morale Boost"
-            case .challengeLeech: return "🔥 Challenge"
-            case .challengeNew: return "🌱 New"
-            default: return nil
-            }
+            // Etykiety UI usunięte na prośbę użytkownika: adaptacja działa całkowicie w tle
+            return nil
         }
     }
 
@@ -560,59 +900,70 @@ struct AdaptiveCardSelector {
 
     static func selectNextCard(
         from pool: [(card: Flashcard, deckId: UUID)],
-        consecutiveFailures: Int,
-        consecutiveSuccesses: Int,
+        isInRescueMode: Bool,
+        isInChallengeMode: Bool,
+        currentCardId: UUID? = nil,
         preferredSide: StudySideOption
     ) -> SelectionResult? {
         guard !pool.isEmpty else { return nil }
 
         let now = Date()
+        let availablePool = (pool.count > 1 && currentCardId != nil)
+            ? pool.filter { $0.card.id != currentCardId }
+            : pool
 
-        // 1. MORALE RESCUE (PITY SYSTEM): 3 lub więcej błędów z rzędu -> podrzucamy łatwiejszą opcję
-        if consecutiveFailures >= 3 {
-            // Szukamy karty o wysokiej pewności (wyższe pudełko lub wysoki ratio sukcesu)
-            let confidenceCandidates = pool.filter { $0.card.box >= 2 || $0.card.accuracyRatio > 0.75 }
-            if let best = confidenceCandidates.max(by: { $0.card.accuracyRatio < $1.card.accuracyRatio }) {
+        // 1. TRYB WSPOMAGAJĄCY (MORALE RESCUE): łatwiejsze pytania aż do pierwszej poprawnej odpowiedzi
+        if isInRescueMode {
+            // Kandydaci łatwiejsi: wyższe pudełka (Box 2, 3, 4), wysoki wskaźnik poprawności lub stabilny streak
+            let easyCandidates = availablePool.filter {
+                $0.card.box >= 2 || $0.card.accuracyRatio >= 0.70 || $0.card.streak >= 2
+            }
+
+            if let chosen = easyCandidates.randomElement() {
+                return SelectionResult(card: chosen.card, deckId: chosen.deckId, reason: .moraleRescue, reverseSide: false)
+            }
+
+            // Fallback: karta o najwyższym pudełku i dokładności w puli
+            if let best = availablePool.max(by: {
+                if $0.card.box != $1.card.box { return $0.card.box < $1.card.box }
+                return $0.card.accuracyRatio < $1.card.accuracyRatio
+            }) {
                 return SelectionResult(card: best.card, deckId: best.deckId, reason: .moraleRescue, reverseSide: false)
             }
-            if let fallback = pool.max(by: { $0.card.correctCount < $1.card.correctCount }) {
-                return SelectionResult(card: fallback.card, deckId: fallback.deckId, reason: .moraleRescue, reverseSide: false)
+        }
+
+        // 2. TRYB WYZWANIA (CHALLENGE FLOW): trudniejsze pytania po serii sukcesów, kontynuowane tak długo jak użytkownik odpowiada poprawnie
+        if isInChallengeMode {
+            // Kandydaci trudniejsi: pijawki, Box 0-1, karty nowe/nieprzejrzane, niższa skuteczność (< 70%)
+            let harderCandidates = availablePool.filter {
+                $0.card.isLeech ||
+                $0.card.box <= 1 ||
+                $0.card.lastReviewDate == nil ||
+                $0.card.accuracyRatio < 0.70
+            }
+
+            if let chosen = harderCandidates.randomElement() {
+                let reason: SelectionReason = chosen.card.isLeech ? .challengeLeech : .challengeNew
+                return SelectionResult(card: chosen.card, deckId: chosen.deckId, reason: reason, reverseSide: false)
+            }
+
+            // Jeśli wszystkie karty są już opanowane: odwrócenie strony lub najniższe dostępne pudełko
+            if let chosen = availablePool.min(by: { $0.card.box < $1.card.box }) {
+                return SelectionResult(card: chosen.card, deckId: chosen.deckId, reason: .challengeLeech, reverseSide: true)
             }
         }
 
-        // 2. CHALLENGE ENGINE: 5 lub więcej sukcesów z rzędu -> podkręcamy trudność, by nauka była przyjemnym wysiłkiem
-        if consecutiveSuccesses >= 5 {
-            // Priorytet A: Pijawka (karta sprawiająca w przeszłości trudności)
-            let leeches = pool.filter { $0.card.isLeech }
-            if let leech = leeches.randomElement() {
-                return SelectionResult(card: leech.card, deckId: leech.deckId, reason: .challengeLeech, reverseSide: false)
-            }
+        // 3. STANDARD LEITNER: Karty przeterminowane (Due Cards) posortowane według najniższego pudełka
+        let dueCards = availablePool.filter { $0.card.nextReviewDate <= now }
+        let candidatePool = dueCards.isEmpty ? availablePool : dueCards
 
-            // Priorytet B: Nowa karta (nigdy niewidziana lub z pudełka 0)
-            let newCards = pool.filter { $0.card.lastReviewDate == nil || ($0.card.box == 0 && $0.card.correctCount == 0) }
-            if let newCard = newCards.randomElement() {
-                return SelectionResult(card: newCard.card, deckId: newCard.deckId, reason: .challengeNew, reverseSide: false)
-            }
-
-            // Priorytet C: Odwrócenie strony (wymuszenie aktywnej produkcji zamiast biernego rozpoznawania)
-            if let card = pool.randomElement() {
-                return SelectionResult(card: card.card, deckId: card.deckId, reason: .challengeLeech, reverseSide: true)
-            }
-        }
-
-        // 3. STANDARD LEITNER: Karty, których termin powtórki już minął
-        let dueCards = pool.filter { $0.card.nextReviewDate <= now }
-        let activePool = dueCards.isEmpty ? pool : dueCards
-
-        // Sortowanie: najniższe pudełka najpierw (Box 0 > Box 1...), potem najstarsze z daty
-        let sorted = activePool.sorted { a, b in
+        let sorted = candidatePool.sorted { a, b in
             if a.card.box != b.card.box { return a.card.box < b.card.box }
             return a.card.nextReviewDate < b.card.nextReviewDate
         }
 
-        guard let chosen = sorted.first else {
-            let first = pool.first!
-            return SelectionResult(card: first.card, deckId: first.deckId, reason: .standardPractice, reverseSide: false)
+        guard let chosen = sorted.first ?? availablePool.first else {
+            return nil
         }
 
         let isReversed: Bool
@@ -643,11 +994,13 @@ class FlipItStore: ObservableObject {
     init() {
         loadData()
         if decks.isEmpty {
-            decks.append(Deck(name: "My flashcards", description: "My primary deck", cards: [
+            let initialDeck = Deck(name: "My flashcards", description: "My primary deck", cards: [
                 Flashcard(front: "Cat", back: "Kot"),
                 Flashcard(front: "Dog", back: "Pies"),
                 Flashcard(front: "Apple", back: "Jabłko")
-            ]))
+            ])
+            decks.append(initialDeck)
+            settings.usedDeckIDs.insert(initialDeck.id)
             saveData()
         }
         #if canImport(UIKit)
@@ -663,10 +1016,8 @@ class FlipItStore: ObservableObject {
                 forName: notificationName,
                 object: nil,
                 queue: .main
-            ) { _ in
-                Task { @MainActor in
-                    self.reloadData()
-                }
+            ) { [weak self] _ in
+                self?.reloadData()
             }
         }
     }
@@ -679,20 +1030,6 @@ class FlipItStore: ObservableObject {
         }
         print("CRITICAL: App Group not found. Using local documents.")
         return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-    }
-
-    func deleteAllCards(deckId: UUID) {
-        if let index = decks.firstIndex(where: { $0.id == deckId }) {
-            decks[index].cards.removeAll()
-            saveData()
-        }
-    }
-
-    func deleteLearnedCards(deckId: UUID, minStreak: Int) {
-        if let index = decks.firstIndex(where: { $0.id == deckId }) {
-            decks[index].cards.removeAll { $0.isLearned || $0.streak >= minStreak }
-            saveData()
-        }
     }
 
     func resetAllProgress(deckId: UUID) {
@@ -710,11 +1047,28 @@ class FlipItStore: ObservableObject {
         }
     }
 
+    /// Przywraca stan początkowy danych lokalnych (czysta instalacja: jedna domyślna talia, domyślne ustawienia)
+    func resetToInitialState() {
+        let initialDeck = Deck(name: "My flashcards", description: "My primary deck", cards: [
+            Flashcard(front: "Cat", back: "Kot"),
+            Flashcard(front: "Dog", back: "Pies"),
+            Flashcard(front: "Apple", back: "Jabłko")
+        ])
+        self.decks = [initialDeck]
+        var freshSettings = AppSettings()
+        freshSettings.usedDeckIDs = [initialDeck.id]
+        // Zachowujemy wybrany język aplikacji, aby nie resetować preferencji interfejsu
+        freshSettings.appLanguage = self.settings.appLanguage
+        self.settings = freshSettings
+        saveData()
+        StudyTelemetryManager.shared.clearEvents()
+    }
+
     func saveData() {
         let url = getDocumentsDirectory().appendingPathComponent(fileName)
         do {
             let data = try JSONEncoder().encode(decks)
-            try data.write(to: url)
+            try data.write(to: url, options: [.atomic])
 
             if let settingsData = try? JSONEncoder().encode(settings) {
                 UserDefaults(suiteName: APP_GROUP_ID)?.set(settingsData, forKey: "AppSettings")
@@ -812,29 +1166,349 @@ class FlipItStore: ObservableObject {
         }
     }
 
-    // --- ACTIONS (CRUD) ---
+    // --- DECK MARKET ---
 
-    func addDeck(name: String, description: String, frontLabel: String, backLabel: String, frontLanguage: String, backLanguage: String) {
-            let finalFront = frontLabel.isEmpty ? "Front" : frontLabel
-            let finalBack = backLabel.isEmpty ? "Back" : backLabel
-
-            // Tworzymy deck z językami
-            let newDeck = Deck(
-                name: name,
-                description: description,
-                frontLabel: finalFront,
-                backLabel: finalBack,
-                frontLanguage: frontLanguage,
-                backLanguage: backLanguage, // Przekazujemy języki
-                cards: []
-            )
+    /// Importuje talię z Giełdy Decków jako nową lokalną talię (wszystkie karty od box 0)
+    func importMarketDeck(from sharedDeck: SharedDeck) {
+        let freshCards = sharedDeck.cardsPayload.map { shared in
+            Flashcard(front: shared.front, back: shared.back)
+        }
+        let newDeck = Deck(
+            name: sharedDeck.title,
+            description: sharedDeck.description,
+            frontLabel: sharedDeck.frontLabel,
+            backLabel: sharedDeck.backLabel,
+            frontLanguage: sharedDeck.frontLanguage,
+            backLanguage: sharedDeck.backLanguage,
+            cards: freshCards,
+            shareCode: sharedDeck.shareCode,
+            isMarketAuthor: false,
+            isMarketPublic: sharedDeck.isPublic,
+            marketVersion: 1,
+            hasPendingMarketUpdate: false,
+            lastDismissedUpdateDate: sharedDeck.updatedAt ?? sharedDeck.createdAt,
+            difficultyLevel: sharedDeck.difficultyLevel,
+            syncedMarketCards: sharedDeck.cardsPayload
+        )
         if decks.isEmpty {
-                decks.append(newDeck)
-            } else {
-                decks.insert(newDeck, at: 1)
-            }
+            decks.append(newDeck)
+        } else {
+            decks.insert(newDeck, at: 1)
+        }
+        settings.usedDeckIDs.insert(newDeck.id)
+        saveData()
+    }
+
+    /// Aktualizuje kod giełdowy lokalnej talii (po publikacji na Giełdzie Decków)
+    func updateDeckShareCode(deckId: UUID, shareCode: String, isMarketAuthor: Bool = true, isMarketPublic: Bool = true) {
+        if let index = decks.firstIndex(where: { $0.id == deckId }) {
+            decks[index].shareCode = shareCode
+            decks[index].isMarketAuthor = isMarketAuthor
+            decks[index].isMarketPublic = isMarketPublic
             saveData()
         }
+    }
+
+    /// Zmienia widoczność publiczną/prywatną talii na Giełdzie
+    func setDeckMarketVisibility(deckId: UUID, isPublic: Bool) {
+        if let index = decks.firstIndex(where: { $0.id == deckId }) {
+            decks[index].isMarketPublic = isPublic
+            saveData()
+        }
+    }
+
+    /// Wycofuje talię z publicznej giełdy (zachowuje shareCode, zmienia isMarketPublic na false)
+    func unpublishDeckFromMarket(deckId: UUID) {
+        if let index = decks.firstIndex(where: { $0.id == deckId }) {
+            decks[index].isMarketPublic = false
+            saveData()
+        }
+    }
+
+    /// Usuwa powiązanie giełdowe decku (po wycofaniu z rynku przez autora)
+    func removeDeckShareCode(deckId: UUID) {
+        if let index = decks.firstIndex(where: { $0.id == deckId }) {
+            decks[index].shareCode = nil
+            decks[index].isMarketAuthor = false
+            decks[index].isMarketPublic = false
+            saveData()
+        }
+    }
+
+    struct SyncCardItem: Identifiable, Equatable {
+        var id = UUID()
+        let front: String
+        let newBack: String
+        let oldBack: String?
+        let changeType: SyncChangeType
+        var isSelected: Bool
+
+        enum SyncChangeType: Equatable {
+            case userModified   // Żółty: Zmodyfikowana przez użytkownika, autor też zmienił. Domyślnie odznaczona (isSelected = false)
+            case authorUpdated  // Niebieski: Zaktualizowana przez autora, użytkownik nie dotykał. Domyślnie zaznaczona (isSelected = true)
+            case authorAdded    // Zielony: Nowa fiszka od autora. Domyślnie zaznaczona (isSelected = true)
+            case authorDeleted  // Czerwony: Usunięta przez autora. Domyślnie odznaczona (isSelected = false)
+        }
+    }
+
+    struct SyncDiffResult {
+        var userModifiedCards: [SyncCardItem]
+        var authorUpdatedCards: [SyncCardItem]
+        var addedCards: [SyncCardItem]
+        var deletedCards: [SyncCardItem]
+        var unchangedCount: Int
+        var userAddedCardsCount: Int
+
+        var totalChangesCount: Int {
+            userModifiedCards.count + authorUpdatedCards.count + addedCards.count + deletedCards.count
+        }
+
+        var hasChanges: Bool {
+            totalChangesCount > 0
+        }
+    }
+
+    func calculateSyncDiff(deckId: UUID, remoteDeck: SharedDeck) -> SyncDiffResult? {
+        guard let localDeck = decks.first(where: { $0.id == deckId }) else { return nil }
+
+        var userModified: [SyncCardItem] = []
+        var authorUpdated: [SyncCardItem] = []
+        var added: [SyncCardItem] = []
+        var deleted: [SyncCardItem] = []
+        var unchanged = 0
+        var userAdded = 0
+
+        let baseCards = localDeck.syncedMarketCards
+        let baseByFront: [String: [SharedCard]] = Dictionary(grouping: baseCards ?? []) {
+            $0.front.normalizedCardKey
+        }
+
+        let remoteByFront = Dictionary(grouping: remoteDeck.cardsPayload) {
+            $0.front.normalizedCardKey
+        }
+
+        let localByFront = Dictionary(grouping: localDeck.cards) {
+            $0.front.normalizedCardKey
+        }
+
+        // 1. Sprawdzamy karty z serwera (Remote)
+        for remoteCard in remoteDeck.cardsPayload {
+            let key = remoteCard.front.normalizedCardKey
+            let matchingLocals = localByFront[key]
+            let baseCard = baseByFront[key]?.first
+
+            if let local = matchingLocals?.first {
+                let remoteBackClean = remoteCard.back.trimmingCharacters(in: .whitespacesAndNewlines)
+                let localBackClean = local.back.trimmingCharacters(in: .whitespacesAndNewlines)
+                let baseBackClean = baseCard?.back.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                if remoteBackClean == localBackClean {
+                    // Brak różnicy między wersją z serwera a lokalną
+                    unchanged += 1
+                } else {
+                    // Wersja z serwera różni się od wersji lokalnej
+                    let remoteChangedFromBase: Bool
+                    let userChangedFromBase: Bool
+
+                    if let baseBackClean = baseBackClean {
+                        remoteChangedFromBase = (remoteBackClean != baseBackClean)
+                        userChangedFromBase = (localBackClean != baseBackClean)
+                    } else {
+                        // Jeśli brak bazy (legacy deck)
+                        remoteChangedFromBase = true
+                        userChangedFromBase = false
+                    }
+
+                    if remoteChangedFromBase && userChangedFromBase {
+                        // Użytkownik zmodyfikował tę fiszkę u siebie, a autor też ją zaktualizował
+                        // Żółty, domyślnie ODZNACZONY (isSelected = false), aby chronić edycję użytkownika
+                        userModified.append(SyncCardItem(
+                            front: remoteCard.front,
+                            newBack: remoteCard.back,
+                            oldBack: local.back,
+                            changeType: .userModified,
+                            isSelected: false
+                        ))
+                    } else if remoteChangedFromBase {
+                        // Autor wprowadził zmiany, użytkownik nie modyfikował fiszki
+                        // Niebieski, domyślnie ZAZNACZONY (isSelected = true)
+                        authorUpdated.append(SyncCardItem(
+                            front: remoteCard.front,
+                            newBack: remoteCard.back,
+                            oldBack: local.back,
+                            changeType: .authorUpdated,
+                            isSelected: true
+                        ))
+                    } else {
+                        // Tylko użytkownik zmienił fiszkę lokalnie, autor nic nie zmienił
+                        // Nie jest to zmiana autora!
+                        unchanged += 1
+                    }
+                }
+            } else {
+                // Nowa karta dodana przez autora
+                // Zielony, domyślnie ZAZNACZONY (isSelected = true)
+                added.append(SyncCardItem(
+                    front: remoteCard.front,
+                    newBack: remoteCard.back,
+                    oldBack: nil,
+                    changeType: .authorAdded,
+                    isSelected: true
+                ))
+            }
+        }
+
+        // 2. Sprawdzamy lokalne karty, których nie ma na serwerze
+        for localCard in localDeck.cards {
+            let key = localCard.front.normalizedCardKey
+            if remoteByFront[key] == nil {
+                if baseCards != nil, baseByFront[key] != nil {
+                    // Karta BYŁA pierwotnie w talii autora, ale autor ją usunął z giełdy
+                    // Czerwony, usunięta przez autora, domyślnie ODZNACZONA (isSelected = false), aby nie usuwać bez zgody
+                    deleted.append(SyncCardItem(
+                        front: localCard.front,
+                        newBack: "",
+                        oldBack: localCard.back,
+                        changeType: .authorDeleted,
+                        isSelected: false
+                    ))
+                } else {
+                    // Karta dodana przez samego użytkownika lokalnie!
+                    // NIE jest to usunięcie autora - zachowujemy ją w 100% nienaruszoną
+                    userAdded += 1
+                }
+            }
+        }
+
+        return SyncDiffResult(
+            userModifiedCards: userModified,
+            authorUpdatedCards: authorUpdated,
+            addedCards: added,
+            deletedCards: deleted,
+            unchangedCount: unchanged,
+            userAddedCardsCount: userAdded
+        )
+    }
+
+    func applyCustomSync(
+        deckId: UUID,
+        remoteDeck: SharedDeck,
+        userModifiedItems: [SyncCardItem],
+        authorUpdatedItems: [SyncCardItem],
+        addedItems: [SyncCardItem],
+        deletedItems: [SyncCardItem]
+    ) {
+        guard let index = decks.firstIndex(where: { $0.id == deckId }) else { return }
+
+        // 1. Zastosowanie nowo dodanych fiszek od autora (zaznaczonych)
+        for item in addedItems where item.isSelected {
+            let key = item.front.normalizedCardKey
+            if !decks[index].cards.contains(where: { $0.front.normalizedCardKey == key }) {
+                let newCard = Flashcard(front: item.front, back: item.newBack)
+                decks[index].cards.append(newCard)
+            }
+        }
+
+        // 2. Zastosowanie aktualizacji autora (zaznaczonych, niebieskich)
+        let authorMap = Dictionary(uniqueKeysWithValues:
+            authorUpdatedItems.filter { $0.isSelected }.map { ($0.front.normalizedCardKey, $0.newBack) }
+        )
+        for i in 0..<decks[index].cards.count {
+            let key = decks[index].cards[i].front.normalizedCardKey
+            if let newBack = authorMap[key] {
+                decks[index].cards[i].back = newBack
+            }
+        }
+
+        // 3. Zastosowanie nadpisania edycji użytkownika (zaznaczonych, żółtych)
+        let userModMap = Dictionary(uniqueKeysWithValues:
+            userModifiedItems.filter { $0.isSelected }.map { ($0.front.normalizedCardKey, $0.newBack) }
+        )
+        for i in 0..<decks[index].cards.count {
+            let key = decks[index].cards[i].front.normalizedCardKey
+            if let newBack = userModMap[key] {
+                decks[index].cards[i].back = newBack
+            }
+        }
+
+        // 4. Usunięcie fiszek skasowanych przez autora (jeśli użytkownik zaznaczył do usunięcia, czerwonych)
+        let deletions = Set(deletedItems.filter { $0.isSelected }.map { $0.front.normalizedCardKey })
+        if !deletions.isEmpty {
+            decks[index].cards.removeAll { card in
+                deletions.contains(card.front.normalizedCardKey)
+            }
+        }
+
+        // 5. Aktualizacja metadanych talii
+        if !remoteDeck.title.isEmpty {
+            decks[index].name = remoteDeck.title
+        }
+        if !remoteDeck.description.isEmpty {
+            decks[index].description = remoteDeck.description
+        }
+        decks[index].isMarketPublic = remoteDeck.isPublic
+        decks[index].marketVersion += 1
+        decks[index].hasPendingMarketUpdate = false
+        decks[index].lastDismissedUpdateDate = remoteDeck.updatedAt ?? remoteDeck.createdAt ?? "\(remoteDeck.cardsCount)"
+        decks[index].syncedMarketCards = remoteDeck.cardsPayload
+
+        saveData()
+    }
+
+    func smartSyncDeck(deckId: UUID, remoteDeck: SharedDeck, keepDeletedCards: Bool) {
+        guard let diff = calculateSyncDiff(deckId: deckId, remoteDeck: remoteDeck) else { return }
+        var deleted = diff.deletedCards
+        if !keepDeletedCards {
+            for i in 0..<deleted.count {
+                deleted[i].isSelected = true
+            }
+        }
+        applyCustomSync(
+            deckId: deckId,
+            remoteDeck: remoteDeck,
+            userModifiedItems: diff.userModifiedCards,
+            authorUpdatedItems: diff.authorUpdatedCards,
+            addedItems: diff.addedCards,
+            deletedItems: deleted
+        )
+    }
+
+    /// Odrzuca oczekującą aktualizację talii (użytkownik decyduje się pozostać przy obecnej wersji)
+    func dismissMarketUpdate(deckId: UUID, remoteVersion: String) {
+        if let index = decks.firstIndex(where: { $0.id == deckId }) {
+            decks[index].hasPendingMarketUpdate = false
+            decks[index].lastDismissedUpdateDate = remoteVersion
+            saveData()
+        }
+    }
+
+    // --- ACTIONS (CRUD) ---
+
+    @discardableResult
+    func addDeck(name: String, description: String, frontLabel: String, backLabel: String, frontLanguage: String, backLanguage: String, difficultyLevel: String? = nil) -> Deck {
+        let finalFront = frontLabel.isEmpty ? "Front" : frontLabel
+        let finalBack = backLabel.isEmpty ? "Back" : backLabel
+
+        // Tworzymy deck z językami i poziomem
+        let newDeck = Deck(
+            name: name,
+            description: description,
+            frontLabel: finalFront,
+            backLabel: finalBack,
+            frontLanguage: frontLanguage,
+            backLanguage: backLanguage, // Przekazujemy języki
+            cards: [],
+            difficultyLevel: difficultyLevel
+        )
+        if decks.isEmpty {
+            decks.append(newDeck)
+        } else {
+            decks.insert(newDeck, at: 1)
+        }
+        settings.usedDeckIDs.insert(newDeck.id)
+        saveData()
+        return newDeck
+    }
 
     func deleteDeck(at offsets: IndexSet) {
         if offsets.contains(0) { return }
@@ -862,7 +1536,7 @@ class FlipItStore: ObservableObject {
         }
     }
 
-    func updateDeck(deckId: UUID, name: String, description: String, frontLabel: String, backLabel: String, frontLanguage: String, backLanguage: String) {
+    func updateDeck(deckId: UUID, name: String, description: String, frontLabel: String, backLabel: String, frontLanguage: String, backLanguage: String, difficultyLevel: String? = nil) {
         if let index = decks.firstIndex(where: { $0.id == deckId }) {
             var finalName = name
             if index == 0 {
@@ -875,6 +1549,7 @@ class FlipItStore: ObservableObject {
             // Aktualizacja języków
             decks[index].frontLanguage = frontLanguage
             decks[index].backLanguage = backLanguage
+            decks[index].difficultyLevel = difficultyLevel
             saveData()
         }
     }
@@ -986,6 +1661,44 @@ class FlipItStore: ObservableObject {
                     wasChallenge: wasChallenge
                 ))
             }
+
+            // Automatyczne anonimowe raportowanie powtórek dla talii z Giełdy
+            if let shareCode = decks[dIndex].shareCode {
+                reportMarketUsage(deckId: deckId, shareCode: shareCode)
+            }
+        }
+    }
+
+    /// Opcjonalny callback do raportowania statystyk giełdowych (podpinany w aplikacji głównej)
+    var onMarketReviewReport: ((_ shareCode: String, _ count: Int, _ isReturnUser: Bool) -> Void)?
+
+    private var marketReviewBuffers: [String: Int] = [:]
+
+    private func reportMarketUsage(deckId: UUID, shareCode: String) {
+        marketReviewBuffers[shareCode, default: 0] += 1
+        
+        // Wysyłamy w paczkach co 5 powtórek, by nie obciążać sieci
+        if marketReviewBuffers[shareCode, default: 0] >= 5 {
+            let count = marketReviewBuffers[shareCode, default: 0]
+            marketReviewBuffers[shareCode] = 0
+            
+            // Wskaźnik powracalności: czy użytkownik wrócił do nauki po min. 24h?
+            let firstStudyKey = "market_first_study_\(shareCode)"
+            let returnReportedKey = "market_return_reported_\(shareCode)"
+            
+            var isReturn = false
+            let now = Date()
+            if let firstDate = UserDefaults.standard.object(forKey: firstStudyKey) as? Date {
+                let alreadyReported = UserDefaults.standard.bool(forKey: returnReportedKey)
+                if !alreadyReported && now.timeIntervalSince(firstDate) >= 86400 {
+                    isReturn = true
+                    UserDefaults.standard.set(true, forKey: returnReportedKey)
+                }
+            } else {
+                UserDefaults.standard.set(now, forKey: firstStudyKey)
+            }
+            
+            onMarketReviewReport?(shareCode, count, isReturn)
         }
     }
 

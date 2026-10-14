@@ -9,7 +9,13 @@ struct AddCardSheet: View {
     @State private var back = ""
     @State private var showNewDeckSheet = false
     @State private var showDuplicateAlert = false
+    @State private var showDiscardAlert = false
     @State private var pendingAction: () -> Void = {}
+
+    var hasUnsavedContent: Bool {
+        !front.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !back.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     init(store: FlipItStore, isPresented: Binding<Bool>, selectedDeckId: UUID) {
         self.store = store
@@ -105,8 +111,13 @@ struct AddCardSheet: View {
             .navigationTitle("Add Card")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { isPresented = false }
-                        .fontWeight(.bold)
+                    Button("Cancel") {
+                        if hasUnsavedContent {
+                            showDiscardAlert = true
+                        } else {
+                            isPresented = false
+                        }
+                    }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
@@ -124,6 +135,7 @@ struct AddCardSheet: View {
                     }
                 }
             }
+            .interactiveDismissDisabled(hasUnsavedContent)
             // Alert potwierdzający dodanie duplikatu
             .alert("Duplicate Found", isPresented: $showDuplicateAlert) {
                 Button("Cancel", role: .cancel) { }
@@ -132,6 +144,14 @@ struct AddCardSheet: View {
                 }
             } message: {
                 Text("A card with the same front or back already exists in this deck. Do you want to add it anyway?")
+            }
+            .alert("Discard Card?", isPresented: $showDiscardAlert) {
+                Button("Keep Editing", role: .cancel) { }
+                Button("Discard", role: .destructive) {
+                    isPresented = false
+                }
+            } message: {
+                Text("The card text has not been saved. Are you sure you want to discard it?")
             }
             .sheet(isPresented: $showNewDeckSheet) {
                 NewDeckSheet(store: store) { newId in
