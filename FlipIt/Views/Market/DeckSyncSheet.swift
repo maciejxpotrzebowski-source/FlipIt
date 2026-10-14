@@ -285,7 +285,7 @@ struct DeckSyncSheet: View {
             .navigationTitle("Deck Update")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .platformTrailing) {
                     Button("Cancel") {
                         dismiss()
                     }

@@ -460,7 +460,7 @@ struct CommunityDeckPreviewSheet: View {
             .navigationTitle("Deck Preview")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .platformTrailing) {
                     Button("Done") {
                         dismiss()
                     }

@@ -134,7 +134,6 @@
 "Front Language" = "Front Language";
 "Back Language" = "Back Language";
 "Create" = "Create";
-"Save Changes" = "Save Changes";
 "Delete Learned" = "Delete Learned";
 "Minimum Streak" = "Minimum Streak";
 "Reset Progress" = "Reset Progress";
@@ -333,7 +332,6 @@
 "Check for Updates" = "Check for Updates";
 "Update Available!" = "Update Available!";
 "Copy Community Code: %@" = "Copy Community Code: %@";
-"Community Update Available" = "Community Update Available";
 "The author has published updates or new cards." = "The author has published updates or new cards.";
 "Review" = "Review";
 "Decline" = "Decline";
@@ -485,16 +483,7 @@
 // MARK: - AI Models Selection & Pro
 "AI Model" = "AI Model";
 "Choose the AI model for flashcard generation and deck analysis." = "Choose the AI model for flashcard generation and deck analysis.";
-"FlipIt Pro" = "FlipIt Pro";
-"FlipIt Pro Status" = "FlipIt Pro Status";
-"Active (AI flashcards unlocked)" = "Active (AI flashcards unlocked)";
-"Free tier" = "Free tier";
-"FlipIt Pro Required" = "FlipIt Pro Required";
 "AI flashcard generation is available exclusively for FlipIt Pro users." = "AI flashcard generation is available exclusively for FlipIt Pro users.";
-"Unlimited AI flashcard generation" = "Unlimited AI flashcard generation";
-"Custom topic, level & vocabulary prompts" = "Custom topic, level & vocabulary prompts";
-"Instant dual-language deck population" = "Instant dual-language deck population";
-"Unlock FlipIt Pro" = "Unlock FlipIt Pro";
 "Speed & Limit" = "Speed & Limit";
 "Free Daily Limit:" = "Free Daily Limit:";
 "Est. 100 Cards:" = "Est. 100 Cards:";
@@ -516,7 +505,6 @@
 "AI 3.5 Flash-Lite" = "AI 3.5 Flash-Lite";
 "AI 3 Flash" = "AI 3 Flash";
 "AI 3.8 Flash" = "AI 3.8 Flash";
-"Close" = "Close";
 "AI service is temporarily busy. Please try again in a moment." = "AI service is temporarily busy. Please try again in a moment.";
 "Daily AI limit reached. Please try again tomorrow or switch models." = "Daily AI limit reached. Please try again tomorrow or switch models.";
 "Save (%lld)" = "Save (%lld)";

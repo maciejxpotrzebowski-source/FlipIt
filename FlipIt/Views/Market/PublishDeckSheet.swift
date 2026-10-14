@@ -40,7 +40,7 @@ struct PublishDeckSheet: View {
             .interactiveDismissDisabled(isPublishing)
             .toolbar {
                 if publishedDeck == nil {
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .platformTrailing) {
                         Button("Cancel") {
                             dismiss()
                         }

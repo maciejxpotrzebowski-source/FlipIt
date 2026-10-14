@@ -382,7 +382,7 @@ struct DeckMarketView: View {
                     }
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .hideNavigationBarCompat()
             .navigationBarBackButtonHidden(true)
             .navigationDestination(isPresented: $navigateToDeckDetail) {
                 if let deck = selectedDeckForDetail {

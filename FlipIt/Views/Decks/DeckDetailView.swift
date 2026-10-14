@@ -372,7 +372,7 @@ struct DeckDetailView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
-        .toolbar(.hidden, for: .navigationBar)
+        .hideNavigationBarCompat()
         .safeAreaInset(edge: .bottom) {
             bottomActionBar
         }

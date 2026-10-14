@@ -233,52 +233,52 @@ struct FlipItTests {
 
         let pool = [(card: hardCard, deckId: deckId), (card: easyCard, deckId: deckId)]
 
-        // 2 failures -> normal mode
-        let result2Fails = AdaptiveCardSelector.selectNextCard(
+        // Normal mode
+        let resultNormal = AdaptiveCardSelector.selectNextCard(
             from: pool,
-            consecutiveFailures: 2,
-            consecutiveSuccesses: 0,
+            isInRescueMode: false,
+            isInChallengeMode: false,
             preferredSide: .front
         )
-        #expect(result2Fails?.reason != .moraleRescue)
+        #expect(resultNormal?.reason != .moraleRescue)
 
-        // 3 failures -> Morale Rescue triggered! Must pick easyCard
-        let result3Fails = AdaptiveCardSelector.selectNextCard(
+        // Morale Rescue triggered! Must pick easyCard
+        let resultRescue = AdaptiveCardSelector.selectNextCard(
             from: pool,
-            consecutiveFailures: 3,
-            consecutiveSuccesses: 0,
+            isInRescueMode: true,
+            isInChallengeMode: false,
             preferredSide: .front
         )
-        #expect(result3Fails?.reason == .moraleRescue)
-        #expect(result3Fails?.card.front == "Easy")
+        #expect(resultRescue?.reason == .moraleRescue)
+        #expect(resultRescue?.card.front == "Easy")
     }
 
-    @Test("AdaptiveCardSelector triggers Challenge Engine after 5 consecutive successes")
+    @Test("AdaptiveCardSelector triggers Challenge Engine after consecutive successes")
     func testAdaptiveSelectorChallengeEngine() {
         let deckId = UUID()
-        let normalCard = Flashcard(front: "Normal", back: "Normalne", box: 2, correctCount: 5, incorrectCount: 1)
-        let leechCard = Flashcard(front: "Leech", back: "Trudny orzech", box: 1, correctCount: 2, incorrectCount: 4)
+        let normalCard = Flashcard(front: "Normal", back: "Normalne", box: 2, lastReviewDate: Date(), correctCount: 5, incorrectCount: 1)
+        let leechCard = Flashcard(front: "Leech", back: "Trudny orzech", box: 1, lastReviewDate: Date(), correctCount: 2, incorrectCount: 4)
 
         let pool = [(card: normalCard, deckId: deckId), (card: leechCard, deckId: deckId)]
 
-        // 4 successes -> normal mode
-        let result4Wins = AdaptiveCardSelector.selectNextCard(
+        // Normal mode
+        let resultNormal = AdaptiveCardSelector.selectNextCard(
             from: pool,
-            consecutiveFailures: 0,
-            consecutiveSuccesses: 4,
+            isInRescueMode: false,
+            isInChallengeMode: false,
             preferredSide: .front
         )
-        #expect(result4Wins?.reason != .challengeLeech)
+        #expect(resultNormal?.reason != .challengeLeech)
 
-        // 5 successes -> Challenge Engine triggered! Must pick leechCard
-        let result5Wins = AdaptiveCardSelector.selectNextCard(
+        // Challenge Engine triggered! Must pick leechCard
+        let resultChallenge = AdaptiveCardSelector.selectNextCard(
             from: pool,
-            consecutiveFailures: 0,
-            consecutiveSuccesses: 5,
+            isInRescueMode: false,
+            isInChallengeMode: true,
             preferredSide: .front
         )
-        #expect(result5Wins?.reason == .challengeLeech)
-        #expect(result5Wins?.card.front == "Leech")
+        #expect(resultChallenge?.reason == .challengeLeech)
+        #expect(resultChallenge?.card.front == "Leech")
     }
 
     @Test("AdaptiveCardSelector maintains continuous Rescue Mode across failures until success")
@@ -323,9 +323,9 @@ struct FlipItTests {
     @Test("AdaptiveCardSelector maintains continuous Challenge Mode across successes until error")
     func testAdaptiveSelectorContinuousChallengeMode() {
         let deckId = UUID()
-        let easyCard = Flashcard(front: "Easy", back: "Łatwe", box: 4, correctCount: 10, incorrectCount: 0)
-        let leechCard1 = Flashcard(front: "Leech1", back: "T1", box: 1, correctCount: 2, incorrectCount: 4)
-        let leechCard2 = Flashcard(front: "Leech2", back: "T2", box: 0, correctCount: 1, incorrectCount: 5)
+        let easyCard = Flashcard(front: "Easy", back: "Łatwe", box: 4, lastReviewDate: Date(), correctCount: 10, incorrectCount: 0)
+        let leechCard1 = Flashcard(front: "Leech1", back: "T1", box: 1, lastReviewDate: Date(), correctCount: 2, incorrectCount: 4)
+        let leechCard2 = Flashcard(front: "Leech2", back: "T2", box: 0, lastReviewDate: Date(), correctCount: 1, incorrectCount: 5)
 
         let pool = [
             (card: easyCard, deckId: deckId),
@@ -386,5 +386,173 @@ struct FlipItTests {
 
         StudyTelemetryManager.shared.clearEvents()
         #expect(StudyTelemetryManager.shared.eventsCount() == 0)
+    }
+
+    @Test("calculateSyncDiff categorizes all 5 sync diff categories properly")
+    @MainActor
+    func testCalculateSyncDiffAllFiveCategories() {
+        let store = FlipItStore()
+        let deckId = UUID()
+
+        // 1. Base market cards (original state of author's deck when downloaded)
+        let baseCards = [
+            SharedCard(front: "Dog", back: "Pies"),
+            SharedCard(front: "Cat", back: "Kot"),
+            SharedCard(front: "Bird", back: "Ptak"),
+            SharedCard(front: "Fish", back: "Ryba")
+        ]
+
+        // 2. Local deck cards
+        let localDog = Flashcard(front: "Dog", back: "Pies") // unchanged
+        let localCat = Flashcard(front: "Cat", back: "Kot") // user untouched, author updated
+        let localBird = Flashcard(front: "Bird", back: "Ptaszysko") // user modified
+        let localFish = Flashcard(front: "Fish", back: "Ryba") // author deleted
+        let localFox = Flashcard(front: "Fox", back: "Lis") // user added
+
+        let localDeck = Deck(
+            id: deckId,
+            name: "Animal Vocab",
+            cards: [localDog, localCat, localBird, localFish, localFox],
+            shareCode: "ANML1234",
+            isMarketAuthor: false,
+            syncedMarketCards: baseCards
+        )
+        store.decks = [localDeck]
+
+        // 3. Remote deck published by author
+        let remotePayload = [
+            SharedCard(front: "Dog", back: "Pies"), // unchanged
+            SharedCard(front: "Cat", back: "Kotek"), // authorUpdated
+            SharedCard(front: "Bird", back: "Ptaszek"), // userModified (conflict)
+            SharedCard(front: "Horse", back: "Koń") // authorAdded
+            // "Fish" is omitted by author -> authorDeleted
+        ]
+
+        let remoteDeck = SharedDeck(
+            shareCode: "ANML1234",
+            title: "Animal Vocab",
+            cardsCount: 4,
+            cardsPayload: remotePayload
+        )
+
+        // 4. Calculate diff
+        guard let diff = store.calculateSyncDiff(deckId: deckId, remoteDeck: remoteDeck) else {
+            Issue.record("Failed to calculate sync diff")
+            return
+        }
+
+        // 5. Verify all 5 categories
+        // Category 1: authorAdded
+        #expect(diff.addedCards.count == 1)
+        #expect(diff.addedCards.first?.front == "Horse")
+        #expect(diff.addedCards.first?.newBack == "Koń")
+        #expect(diff.addedCards.first?.changeType == .authorAdded)
+        #expect(diff.addedCards.first?.isSelected == true)
+
+        // Category 2: authorUpdated
+        #expect(diff.authorUpdatedCards.count == 1)
+        #expect(diff.authorUpdatedCards.first?.front == "Cat")
+        #expect(diff.authorUpdatedCards.first?.newBack == "Kotek")
+        #expect(diff.authorUpdatedCards.first?.oldBack == "Kot")
+        #expect(diff.authorUpdatedCards.first?.changeType == .authorUpdated)
+        #expect(diff.authorUpdatedCards.first?.isSelected == true)
+
+        // Category 3: userModified (conflict)
+        #expect(diff.userModifiedCards.count == 1)
+        #expect(diff.userModifiedCards.first?.front == "Bird")
+        #expect(diff.userModifiedCards.first?.newBack == "Ptaszek")
+        #expect(diff.userModifiedCards.first?.oldBack == "Ptaszysko")
+        #expect(diff.userModifiedCards.first?.changeType == .userModified)
+        #expect(diff.userModifiedCards.first?.isSelected == false)
+
+        // Category 4: authorDeleted
+        #expect(diff.deletedCards.count == 1)
+        #expect(diff.deletedCards.first?.front == "Fish")
+        #expect(diff.deletedCards.first?.changeType == .authorDeleted)
+        #expect(diff.deletedCards.first?.isSelected == false)
+
+        // Category 5: userAdded
+        #expect(diff.userAddedCardsCount == 1)
+        #expect(diff.unchangedCount == 1)
+    }
+
+    @Test("applyCustomSync preserves Leitner progress and stats during updates")
+    @MainActor
+    func testSyncPreservesLeitnerProgressAndStats() {
+        let store = FlipItStore()
+        let deckId = UUID()
+        let reviewDate = Date(timeIntervalSince1970: 1800000000)
+
+        let baseCards = [
+            SharedCard(front: "Cat", back: "Kot"),
+            SharedCard(front: "Fish", back: "Ryba")
+        ]
+
+        var catCard = Flashcard(front: "Cat", back: "Kot")
+        catCard.box = 3
+        catCard.streak = 5
+        catCard.isLearned = false
+        catCard.nextReviewDate = reviewDate
+        catCard.correctCount = 12
+        catCard.incorrectCount = 2
+
+        let localDeck = Deck(
+            id: deckId,
+            name: "Animals",
+            cards: [catCard],
+            shareCode: "ANML9999",
+            isMarketAuthor: false,
+            syncedMarketCards: baseCards
+        )
+        store.decks = [localDeck]
+
+        let remotePayload = [
+            SharedCard(front: "Cat", back: "Kotek"),
+            SharedCard(front: "Horse", back: "Koń")
+        ]
+
+        let remoteDeck = SharedDeck(
+            shareCode: "ANML9999",
+            title: "Animals Updated",
+            cardsCount: 2,
+            cardsPayload: remotePayload
+        )
+
+        let authorUpdated = [
+            FlipItStore.SyncCardItem(front: "Cat", newBack: "Kotek", oldBack: "Kot", changeType: .authorUpdated, isSelected: true)
+        ]
+        let added = [
+            FlipItStore.SyncCardItem(front: "Horse", newBack: "Koń", oldBack: nil, changeType: .authorAdded, isSelected: true)
+        ]
+
+        store.applyCustomSync(
+            deckId: deckId,
+            remoteDeck: remoteDeck,
+            userModifiedItems: [],
+            authorUpdatedItems: authorUpdated,
+            addedItems: added,
+            deletedItems: []
+        )
+
+        let updatedDeck = store.decks.first(where: { $0.id == deckId })!
+        let updatedCat = updatedDeck.cards.first(where: { $0.front == "Cat" })!
+
+        // Back is updated
+        #expect(updatedCat.back == "Kotek")
+
+        // Leitner progress & metrics are strictly preserved!
+        #expect(updatedCat.box == 3)
+        #expect(updatedCat.streak == 5)
+        #expect(updatedCat.isLearned == false)
+        #expect(updatedCat.nextReviewDate == reviewDate)
+        #expect(updatedCat.correctCount == 12)
+        #expect(updatedCat.incorrectCount == 2)
+
+        // New card starts at initial box 0
+        let newHorse = updatedDeck.cards.first(where: { $0.front == "Horse" })!
+        #expect(newHorse.back == "Koń")
+        #expect(newHorse.box == 0)
+        #expect(newHorse.streak == 0)
+        #expect(newHorse.isLearned == false)
     }
 }
