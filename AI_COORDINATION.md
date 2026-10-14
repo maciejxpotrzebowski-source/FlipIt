@@ -312,3 +312,9 @@ Następnie zainstaluj najnowszą wersję aplikacji i przetestuj poniższe kroki:
 | S2 (parametry RPC — tabela zgodności) | | | | |
 | S3 (archive_deck) | | | | |
 | S4 (limit report_usage_stats) | | | | |
+
+### Wyniki diagnostyki (Krok 0) — uruchomione przez Maćka 14.10.2026
+- **0.1:** 12 talii z `author_id IS NULL` — 7 prywatnych, 5 publicznych, 0 oficjalnych.
+- **0.2 (lista):** wszystkie utworzone 01–03.10.2026, czyli podczas testów przed wprowadzeniem logowania. Tytuły: `Test`, `Testowa talia przyjaciela` ×2, `Test Public Temporary`, `Test Private` ×2, `Test Public`, `Analytics` ×2, `Top 1000 english`, `Business`, `Test Deck`. Autorzy: `Anonymous`, `Tester`, `Author`, `Maciek`. Pobrania: 0–2.
+- **0.3 (profile):** 0 wierszy → Krok 4 (CHECK na `profiles`) przejdzie bez błędu ✔.
+- **Decyzja Maćka co do 12 talii:** _oczekuje_.
