@@ -318,3 +318,4 @@ Następnie zainstaluj najnowszą wersję aplikacji i przetestuj poniższe kroki:
 - **0.2 (lista):** wszystkie utworzone 01–03.10.2026, czyli podczas testów przed wprowadzeniem logowania. Tytuły: `Test`, `Testowa talia przyjaciela` ×2, `Test Public Temporary`, `Test Private` ×2, `Test Public`, `Analytics` ×2, `Top 1000 english`, `Business`, `Test Deck`. Autorzy: `Anonymous`, `Tester`, `Author`, `Maciek`. Pobrania: 0–2.
 - **0.3 (profile):** 0 wierszy → Krok 4 (CHECK na `profiles`) przejdzie bez błędu ✔.
 - **Decyzja Maćka co do 12 talii:** usunąć wszystkie (dane testowe). SQL wykonuje Maciek ręcznie (`DELETE … WHERE author_id IS NULL`). Przed publikacją aplikacji — pełne czyszczenie bazy z danych testowych (backlog).
+- ✔ **Wykonane 14.10.2026:** `DELETE` usunął dokładnie 12 talii (zgodnie z listą 0.2). W bazie nie ma już talii z `author_id IS NULL`.
