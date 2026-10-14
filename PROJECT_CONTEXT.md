@@ -2,7 +2,8 @@
 
 > **Dokument ciągłości dla asystenta AI i programisty.**  
 > Zapisany w katalogu głównym projektu: `PROJECT_CONTEXT.md`  
-> Ostatnia aktualizacja: 30.09.2026 (Commit: `7a7e802`)
+> Data ostatniej aktualizacji: 14.10.2026  
+> Stan buildu i testów: **Kompilacja macOS i iOS powiodła się (`** BUILD SUCCEEDED **`); 20/20 testów jednostkowych zdanych pomyślnie (`** TEST SUCCEEDED **`)**.
 
 ---
 
@@ -11,8 +12,9 @@
 Kluczowe wyróżniki aplikacji:
 1. **Interactive Widgets (iOS 17+)** — nauka bezpośrednio z ekranu blokady i ekranu początkowego za pomocą App Intents bez konieczności otwierania aplikacji.
 2. **Adaptive Leitner Engine (z psychologią kasyna)** — nauka z dynamicznym dostosowywaniem trudności (koło ratunkowe po błędach, wyzwania po serii sukcesów).
-3. **Prywatność i lekkość** — brak zewnętrznych serwerów śledzących; dane przechowywane lokalnie w App Group.
-4. **FlipIt Pro (Gemini AI)** — opcjonalne generowanie gotowych talii przez Google Gemini API (model `gemini-1.5-flash` / `gemini-1.5-pro` via SPM `generative-ai-swift`).
+3. **Prywatność i model Local-First** — nauka, widgety, prywatne talie oraz postępy Leitnera działają w 100% lokalnie w App Group (`group.com.maciek.FlipIt`) bez wymogu posiadania konta.
+4. **Deck Market & Społeczność (Supabase)** — giełda talii z podziałem na oficjalne i społecznościowe, wyszukiwanie po 8-znakowym unikalnym kodzie (`XXXX-XXXX`), 3-stronna synchronizacja aktualizacji od autora (`DeckSyncSheet`).
+5. **FlipIt Pro (Gemini AI)** — inteligentne generowanie talii fiszek przez Google Gemini API z CEFR gradingiem (A1–C2) oraz automatyczną kategoryzacją tagów.
 
 ---
 
@@ -23,31 +25,60 @@ Kluczowe wyróżniki aplikacji:
 - **Widget Bundle Identifier:** `com.maciek.FlipIt.FlipItWidget`
 - **App Group:** `group.com.maciek.FlipIt` *(krytyczne dla współdzielenia bazy danych między aplikacją a widgetem)*
 - **Development Team:** `862K9Z73NB`
-- **Typ Konta Apple:** **Free Personal Team (Darmowe konto)**. Użytkownik **NIE** posiada płatnego Apple Developer Program i nie chce płacić Apple na tym etapie.
+- **Typ Konta Apple:** **Free Personal Team (Darmowe konto)**. Użytkownik korzysta z darmowego profilu Apple. Capability `Sign in with Apple` wymaga płatnego Apple Developer Program ($99/rok) — dlatego przycisk Apple jest domyślnie wyłączony flagą `AuthManager.isAppleSignInEnabled = false`.
 - **Wdrażanie na iPhone:** Odbywa się lokalnie przez kabel/Wi-Fi w Xcode z darmowym profilem (odnawianym co 7 dni) oraz włączonym Trybem Dewelopera w iOS.
 
 ### Repozytorium i OneDrive (⚠️ BARDZO WAŻNE)
 - **Lokalizacja projektu:** Folder zsynchronizowany z **OneDrive**:  
   `.../02. Coding/FlipIt`
-- **Zasada BHP pracy:** OneDrive może czasami z opóźnieniem synchronizować pliki lub przywracać starsze wersje robocze. **Zawsze na początku sesji sprawdzaj:**
+- **Zasada BHP pracy:** OneDrive może czasami z opóźnieniem synchronizować pliki lub blokować locki gita. **Zawsze na początku sesji sprawdzaj:**
   ```bash
   git status
   git log -n 3 --oneline
   ```
-- **Kompilacja i Testy (bez podpisywania):**
-  - **Build (macOS/iOS):**
-    ```bash
-    xcodebuild -scheme FlipIt -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO build
-    ```
-  - **Testy jednostkowe (wyłącznie FlipItTests):**
-    ```bash
-    xcodebuild test -scheme FlipIt -only-testing:FlipItTests -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
-    ```
-  *(Uwaga: `FlipItUITests` wymagają interfejsu graficznego i uprawnień okna — w headless CLI uruchamiamy tylko `FlipItTests`).*
+
+### Kompilacja i Testy (bez podpisywania kodu)
+- **Build macOS (`arm64`):**
+  ```bash
+  xcodebuild -scheme FlipIt -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO build
+  ```
+- **Testy jednostkowe (`FlipItTests` na macOS):**
+  ```bash
+  xcodebuild test -scheme FlipIt -only-testing:FlipItTests -destination 'platform=macOS,arch=arm64' CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+  ```
+  *(Uwaga: uruchamiamy `FlipItTests`. Suite zawiera 20 testów jednostkowych badających Leitnera, algorytmy adaptacyjne, telemetrię, parsowanie CSV, 5-kategorialny diff synchronizacji talii oraz rzeczywiste generowanie fiszek przez Gemini).*
+- **Build iOS (`generic/platform=iOS`):**
+  ```bash
+  xcodebuild -scheme FlipIt -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO build
+  ```
 
 ---
 
-## 3. 🧠 Model Danych i Algorytm Uczenia
+## 3. 🌐 Architektura Chmury (Supabase) i Model Prywatności
+
+### Co trafia na serwer Supabase, a co zostaje lokalnie?
+| Obszar | Gdzie jest przechowywany | Opis |
+|---|---|---|
+| **Prywatne talie i fiszki** | 📱 Tylko lokalnie (App Group) | Twoje prywatne talie NIGDY nie są wysyłane do Supabase ani widoczne dla nikogo. |
+| **Postępy w nauce (Leitner)** | 📱 Tylko lokalnie (App Group) | Stan pudełek (0..4), serie (`streak`), terminy powtórek (`nextReviewDate`) oraz liczniki błędów/sukcesów są lokalne. |
+| **Telemetria uczenia** | 📱 Tylko lokalnie (`study_telemetry.json`) | Ściśle anonimowe metryki matematyczne (czasy reakcji, morale, wyzwania). Nigdy nie zapisuje treści fiszek. |
+| **Konto użytkownika** | ☁️ Supabase Auth | Identyfikator `auth.uid()`, email (OTP) lub token Google OAuth. |
+| **Profil publiczny** | ☁️ Supabase `profiles` | Unikalny nick `@username` (3–20 znaków: `^[a-zA-Z0-9_]{3,20}$`). Zmiana nicku raz na 30 dni; 60 dni kwarantanny po zmianie/usunięciu konta. |
+| **Talie w Community** | ☁️ Supabase `shared_decks` | Wyłącznie talie **jawnie opublikowane** przez użytkownika. Zawierają treść fiszek, etykiety, języki, CEFR level, tagi, 8-znakowy `share_code`, `author_id` i `author_name`. |
+| **Liczniki statystyk** | ☁️ Supabase `shared_decks` | Łączna liczba pobrań (`downloads_count`) oraz zgłoszone powtórki (`total_reviews_reported`). |
+
+### Bezpieczeństwo i RLS (Migracja `20261015_security_fixes.sql`)
+1. **Brak bezpośrednich modyfikacji klientem:** Operacje usuwania (`delete_deck`), zdejmowania z rynku (`unpublish_deck`), zmiany widoczności (`set_deck_visibility`) i raportowania statystyk (`report_usage_stats`) są realizowane wyłącznie przez dedykowane funkcje PostgreSQL RPC z walidacją `auth.uid()`.
+2. **Zaostrzone RLS:** Tylko zalogowany autor (`author_id = auth.uid()`) może wstawiać talię z własnym ID. Liczniki i flagi oficjalne są chronione triggerami `BEFORE INSERT` / `BEFORE UPDATE`.
+3. **Prawdziwe usuwanie konta:** RPC `delete_my_account()` usuwa użytkownika z `auth.users`, a kaskada usuwa profil. Opublikowane talie zachowują się jako publiczne z `author_id = NULL` (`ON DELETE SET NULL`).
+4. **Wylogowanie hybrydowe:**
+   - **Ścieżka A (Domyślna):** Zachowaj pobrane i lokalne talie na urządzeniu.
+   - **Ścieżka B:** Wyczyść talie użytkownika z urządzenia.
+   - **Wylogowanie wymuszone (wygasła sesja):** Zawsze stosuje ścieżkę A, aby zabezpieczyć użytkownika przed utratą danych.
+
+---
+
+## 4. 🧠 Model Danych i Algorytm Uczenia
 
 ### A. Model Fiszki (`Flashcard`)
 ```swift
@@ -65,9 +96,7 @@ struct Flashcard: Identifiable, Codable, Equatable {
     var correctCount: Int = 0           // Łączna liczba dobrych odpowiedzi
     var incorrectCount: Int = 0         // Łączna liczba błędów
     
-    // Opanowana = Pudełko 4 (21 dni interwału)
     var isLearned: Bool { get { box >= 4 } set { ... } }
-    
     var accuracyRatio: Double { ... }   // Historyczny współczynnik sukcesu
     var isLeech: Bool { ... }           // "Pijawka" (błędy >= 2 i skuteczność < 60%)
 }
@@ -84,93 +113,115 @@ struct Flashcard: Identifiable, Codable, Equatable {
 - Poprawna odpowiedź (✓): `box = min(box + 1, 4)`
 - Błędna odpowiedź (❌): `box = max(box - 1, 0)` (**karta cofa się o 1 poziom, a nie spada do zera!**)
 
-### D. Dynamic Flow Controller (`AdaptiveCardSelector` & Silent Continuous DDA)
-Algorytm monitoruje przebieg sesji i reaguje na skrajne stany całkowicie dyskretnie w tle (bez rozpraszających etykiet/odznak):
-1. **Koło Ratunkowe (Morale Rescue):**
-   - **Warunek:** $\ge 2$ błędy z rzędu lub trwający tryb ratunkowy (`isInRescueMode`).
-   - **Działanie:** Podsuwa różnorodne łatwiejsze karty z wyższych pudełek (`box >= 2` lub skuteczność $\ge 70\%$, z wyłączeniem ostatniej karty).
-   - **Ciągłość:** W razie kolejnych błędów tryb ratunkowy **nie resetuje się** — łatwiejsze pytania trwają nieprzerwanie aż do pierwszej poprawnej odpowiedzi.
-2. **Podkręcenie Poprzeczki (Challenge Engine):**
-   - **Warunek:** $\ge 3$ sukcesy z rzędu lub trwający tryb wyzwania (`isInChallengeMode`).
-   - **Działanie:** Podsuwa „pijawkę” (trudne słówko), kartę z niskiego pudełka/nową lub odwraca kolejność pytania (aktywna produkcja).
-   - **Ciągłość:** Po poprawnej odpowiedzi na trudniejsze pytanie system **kontynuuje serwowanie trudniejszych fiszek** tak długo, jak użytkownik odpowiada poprawnie. Pojedynczy błąd natychmiast wyłącza wyzwanie.
-3. **Tryb Standardowy:**
-   - Wybiera karty przeterminowane (`nextReviewDate <= now`), z priorytetem dla najniższych pudełek (Pudełko 0 > 1 > 2...).
+### D. Dynamic Flow Controller (`AdaptiveCardSelector`)
+1. **Koło Ratunkowe (Morale Rescue):** $\ge 2$ błędy z rzędu podsuwają łatwiejsze karty z wyższych pudełek aż do przełamania złej passy.
+2. **Podkręcenie Poprzeczki (Challenge Engine):** $\ge 3$ sukcesy z rzędu serwują trudniejsze słówka lub odwracają kolejność (produkcja) do pierwszego błędu.
+3. **Tryb Standardowy:** Priorytet dla kart przeterminowanych z najniższych pudełek.
 
-### E. Anonimowa Telemetria Uczenia (`StudyTelemetryManager`)
-- W Ustawieniach znajduje się sekcja **„Uczenie i telemetria”** z przełącznikiem `analyticsEnabled`.
-- Rejestruje **wyłącznie anonimowe parametry matematyczne** (czasy reakcji, poziomy pudełek, długości serii, znaczniki morale/wyzwań).
-- **Treści słówek (przód/tył) NIGDY nie są zapisywane w logach.**
-- Dane zapisywane są w pliku `study_telemetry.json` (max 2000 zdarzeń).
-- Użytkownik może wyeksportować logi jako JSON przez `ShareLink` lub wyczyścić jednym przyciskiem.
+### E. 3-Stronna Synchronizacja Talii (`calculateSyncDiff`)
+Gdy autor aktualizuje talię w Community, pobierający użytkownik widzi arkusz różnic (`DeckSyncSheet`):
+- `authorAdded`: nowe fiszki dodane przez autora (domyślnie zaznaczone do pobrania; trafiają do Pudełka 0).
+- `authorUpdated`: poprawki literówek/treści autora na niemodyfikowanych przez użytkownika kartach.
+- `userModified`: konflikt — użytkownik edytował kartę, a autor też ją zmienił (domyślnie zachowuje wersję użytkownika).
+- `authorDeleted`: fiszki usunięte przez autora (domyślnie odznaczone — użytkownik ich nie traci).
+- `userAdded`: własne karty użytkownika dodane do talii (pozostają nienaruszone).
+- **Postęp nauki:** Synchronizacja **nigdy nie resetuje** `box`, `streak`, `nextReviewDate`, `correctCount` ani `incorrectCount` istniejących kart.
 
 ---
 
-## 4. 🗂️ Struktura Projektu i Plików
+## 5. 🤖 Modele AI (Gemini) i FlipIt Pro
+
+### Realne Modele Produkcyjne Google AI Studio
+Modele są mapowane na rzeczywiste identyfikatory w Google Generative AI API:
+- **`models/gemini-3.5-flash-lite` (Domyślny & Zalecany):** Błyskawiczna generacja (~0.89s w testach), pełna dokładność formatu CSV i CEFR.
+- **`models/gemini-3.8-flash`:** Zaawansowana analiza semantyczna.
+- **`models/gemini-3-flash-preview`:** Wersja podglądowa (~12s).
+- **`models/gemini-3.1-flash-lite`:** Starsza wersja podlegająca okresowym przeciążeniom (503).
+*(Uwaga: Starsze modele `gemini-1.5` i `gemini-2.5` zostały wygaszone przez Google API dla nowych użytkowników).*
+
+### Status FlipIt Pro & Paywall
+- Generowanie AI wymaga aktywnego konta FlipIt i uprawnienia Pro (`store.settings.isPremiumUser = true`).
+- **Wersja DEBUG:** Przycisk `[DEBUG] Unlock FlipIt Pro` pozwala na darmowe odblokowanie do celów testowych.
+- **Wersja RELEASE:** Przycisk testowy jest ukryty; wyświetlana jest informacja `Coming Soon` (`Wkrótce`).
+- **Limity zapytań:** Google AI Studio oferuje darmowy limit 1500 req/dzień per klucz API.
+
+---
+
+## 6. 🗂️ Struktura Projektu i Plików
 
 ```
 FlipIt/
-├── FlipItApp.swift                 # Punkt startowy, wstrzykiwanie store i locale
-├── FlipItModels.swift              # Modele danych (Flashcard, Deck, AppSettings, Store, Leitner, Telemetry)
+├── FlipItApp.swift                 # Punkt startowy, wstrzykiwanie store, auth i locale
+├── FlipItModels.swift              # Modele danych (Flashcard, Deck, AppSettings, FlipItStore, Leitner, Sync Diff)
 ├── FlipItAppIntents.swift          # Intenty interaktywnego widgetu (MarkCard, FlipCard)
-├── APIKeyManager.swift             # Bezpieczne ładowanie klucza Gemini z Config.xcconfig
+├── PlatformCompat.swift            # Warstwa kompatybilności macOS (UIPasteboard shim, feedback, layout)
+├── APIKeyManager.swift             # Bezpieczne ładowanie klucza Gemini z Config.xcconfig / Info.plist
+├── GeminiService.swift             # Klient Google Generative AI (generowanie fiszek CSV, analiza talii, CEFR)
+├── Config.xcconfig                 # (GITIGNORED) Klucze API: GEMINI_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY
+├── Services/
+│   ├── AuthManager.swift           # Uwierzytelnianie (Email OTP, Google OAuth, Apple feature flag, profile)
+│   └── SupabaseManager.swift       # Networking Supabase (RPC, giełda talii, pobieranie po kodzie, statystyki)
 ├── Views/
+│   ├── Auth/
+│   │   ├── AuthPromptSheet.swift   # Wybór metody logowania (Google, Email OTP, warunkowe Apple)
+│   │   ├── EmailOTPSheet.swift     # Logowanie kodem 6-cyfrowym na e-mail
+│   │   ├── SetUsernameSheet.swift  # Nadawanie unikalnego nicku przy rejestracji
+│   │   └── ChangeUsernameSheet.swift # Zmiana nicku (30-dniowy cooldown, 60 dni kwarantanny)
 │   ├── Decks/
-│   │   ├── HomeView.swift          # Główny ekran z listą talii (duży natywny tytuł)
-│   │   ├── DeckDetailView.swift    # Szczegóły talii, sortowanie, lista kart, CTA startu
+│   │   ├── HomeView.swift          # Główny pulpit z listą talii i postępami
+│   │   ├── DeckDetailView.swift    # Karty w talii, wyszukiwanie, opcje nauki, zarządzanie
 │   │   ├── NewDeckSheet.swift      # Tworzenie nowej talii
-│   │   ├── EditDeckSheet.swift     # Edycja nazwy, opisu i etykiet
-│   │   └── ManageDecksView.swift   # Reorganizacja i usuwanie talii
+│   │   └── EditDeckSheet.swift     # Edycja nazwy, języków, poziomu i etykiet
 │   ├── Cards/
-│   │   ├── CardView.swift          # Widok karty 3D (wspiera Dark Mode, dynamiczne kolory)
-│   │   ├── CardRowView.swift       # Wiersz karty w liście (znaczek opanowania ✓ / box)
-│   │   └── AddCardSheet.swift      # Dodawanie nowej karty z limitem znaków
+│   │   ├── CardView.swift          # Interaktywna karta 3D (obrót, dark mode)
+│   │   ├── CardRowView.swift       # Wiersz fiszki z oznaczeniem pudełka i opanowania
+│   │   └── AddCardSheet.swift      # Dodawanie karty z limitem znaków
 │   ├── Study/
-│   │   └── StudySessionView.swift  # Aktywna nauka (swipe Tinder-style, obrót 3D, badges) uruchamiana wprost z HomeView
+│   │   └── StudySessionView.swift  # Tryb nauki (swipe Tinder-style, Leitner, koło ratunkowe, wyzwania)
 │   ├── Market/
-│   │   ├── DeckMarketView.swift    # Giełda Decków (Oficjalne / Społeczność / Szukaj po kodzie 8-znakowym)
-│   │   └── PublishDeckSheet.swift  # Publikacja talii na giełdzie (kod auto-generowany, opcja prywatna)
-│   ├── Settings/
-│   │   └── SettingsView.swift      # Ustawienia języków, widgetu, FlipIt Pro i Telemetrii
+│   │   ├── DeckMarketView.swift    # Giełda talii (Oficjalne / Społeczność / Szukaj po kodzie / Moje talie)
+│   │   ├── PublishDeckSheet.swift  # Publikacja talii (Public/Private, generowanie kodu XXXX-XXXX)
+│   │   ├── DeckSyncSheet.swift     # 3-stronna synchronizacja aktualizacji od autora
+│   │   └── CommunityDeckPreviewSheet.swift # Podgląd talii przed pobraniem
 │   ├── AI/
 │   │   └── AIGenerateView.swift    # Generowanie kart przez Gemini z paywallem Pro
 │   ├── Import/
 │   │   └── ImportView.swift        # Import z plików CSV / JSON
-│   ├── Services/
-│   │   └── SupabaseManager.swift   # Klient Supabase (REST API, RPC, publikowanie, pobieranie po kodzie)
+│   ├── Settings/
+│   │   └── SettingsView.swift      # Ustawienia języków, modelu AI, konta i telemetrii
 │   └── Components/
-│       ├── SpeakerButton.swift     # Synteza mowy (AVSpeechSynthesizer, Dark Mode)
-│       ├── MoveCardsView.swift     # Przenoszenie kart między taliami
-│       ├── DeleteDuplicatesSheet.swift
-│       ├── DeleteLearnedSheet.swift
-│       ├── ResetProgressSheet.swift
-│       └── DeleteAllSheet.swift
+│       └── SpeakerButton.swift     # Synteza mowy (AVSpeechSynthesizer)
 ├── FlipItWidget/
 │   └── FlipItWidget.swift          # Widgety iOS 17 (Study & Add, FlipIt Minimal) z Leitnerem
 ├── FlipItTests/
-│   └── FlipItTests.swift           # 13 testów jednostkowych (Leitner, Telemetria, Parsowanie)
-├── en.lproj/Localizable.strings    # Tłumaczenia angielskie (~170 kluczy)
-└── pl.lproj/Localizable.strings    # Tłumaczenia polskie (~170 kluczy)
+│   └── FlipItTests.swift           # 20 testów jednostkowych (Leitner, Telemetria, Parsowanie, Sync, Gemini API)
+├── supabase/
+│   ├── schema_live.sql             # Rzeczywisty schemat wyeksportowany z bazy Supabase
+│   └── migrations/
+│       └── 20261015_security_fixes.sql # Idempotentna migracja zabezpieczająca RLS i RPC (4 kroki + testy + rollback)
+├── en.lproj/Localizable.strings    # Tłumaczenia angielskie (557 identycznych kluczy)
+└── pl.lproj/Localizable.strings    # Tłumaczenia polskie (557 identycznych kluczy)
 ```
 
 ---
 
-## 5. 🎨 Standardy Wizualne (Apple HIG)
-- **Kolory semantyczne:** Zawsze używać `Color.appGroupedBackground`, `Color.appSecondaryGroupedBackground`, `.primary` i `.secondary`. **Żadnych sztywnych `.white` ani `.black`**, aby Dark Mode działał bezbłędnie.
-- **Puste stany:** Zawsze natywny komponent `ContentUnavailableView(title, systemImage, description)`.
-- **Nawigacja:** Natywne paski tytułowe z automatycznym zwijaniem `.navigationBarTitleDisplayMode(.large)` na ekranach głównych i `.inline` w podwidokach.
-- **Zaokrąglenia i odstępy:** Promień kart i przycisków: `14pt` / `20pt`. Standardowe siatki odstępów: `8`, `12`, `16`, `24`.
+## 7. 🌐 Zasady Lokalizacji (GEMINI.md)
+
+1. Każdy widoczny dla użytkownika tekst **musi** znajdować się w obu plikach:
+   - `FlipIt/en.lproj/Localizable.strings`
+   - `FlipIt/pl.lproj/Localizable.strings`
+2. Identyczne klucze i specyfikatory formatu (`%@`, `%lld`, `%.1f`).
+3. Sprawdzanie poprawności składni:
+   ```bash
+   plutil -lint FlipIt/en.lproj/Localizable.strings
+   plutil -lint FlipIt/pl.lproj/Localizable.strings
+   ```
 
 ---
 
-## 6. 📋 Zadania w Backlogu (Kolejne Kroki)
-1. **Synchronizacja wielourządzeniowa (iCloud Sync / CloudKit):** Wdrożenie modularnej synchronizacji talii i postępów w chmurze (wymaga Apple Developer Program / płatnego konta z capability iCloud Documents lub CloudKit).
-2. **Bufor wyprzedzający widżetu (Prefetching Queue):** Kolejkowanie 3–5 fiszek do przodu w widżecie z asynchronicznym rejestrowaniem odpowiedzi (Action Queue) w celu natychmiastowej responsywności.
-3. **Wyszukiwarka kart i talii:** Dodanie `.searchable(text:)` w `HomeView` i `DeckDetailView`.
-4. **Uproszczenie menu DeckDetailView:** Przeniesienie rzadkich operacji (usuń duplikaty, usuń nauczone) do podmenu lub dedykowanego arkusza „Zarządzanie talią”.
-5. **Komponent `CharacterCountLabel`:** Wyekstrahowanie powtarzającego się kodu liczników znaków.
-6. **Rozbudowa haptyki:** Dodanie haptyki przy obrocie karty i zakończeniu sesji według propozycji.
+## 8. ⚠️ Znane Ograniczenia i Backlog
 
----
-
-> **Dla nowego agenta AI:** Ten projekt jest w 100% stabilny, skompilowany i przetestowany. Kod jest czysty. Przed rozpoczęciem prac przeczytaj ten plik, zrób `git status` i działaj zgodnie z powyższymi regułami.
+1. **Sign in with Apple:** Wymaga konta w płatnym Apple Developer Program. Kod jest w pełni zaimplementowany w `AuthManager.swift`, lecz przycisk w `AuthPromptSheet.swift` jest wyłączony flagą `isAppleSignInEnabled = false`.
+2. **Klucz Gemini w Info.plist:** Na etapie deweloperskim klucz API kompilowany jest z `Config.xcconfig`. W wersji produkcyjnej zalecane jest pośredniczenie przez Supabase Edge Function.
+3. **Zabezpieczenie przed spamem liczników:** RPC `increment_downloads` i `report_usage_stats` aktualizują liczniki globalne. W przyszłości można dodać tabelę zdarzeń `deck_download_events(deck_id, user_id)` z ograniczeniem 1/użytkownik.
+4. **Przejście na URLSession REST:** Google oznaczył `generative-ai-swift` jako deprecated. SDK działa obecnie bez zarzutu, jednak zalecana jest migracja na natywny lekki klient HTTP REST (~80 linii Swift) eliminujący zależność SPM.
