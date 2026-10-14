@@ -555,4 +555,20 @@ struct FlipItTests {
         #expect(newHorse.streak == 0)
         #expect(newHorse.isLearned == false)
     }
+
+    @Test("APIKeyManager returns non-empty geminiKey")
+    func testAPIKeyManager() {
+        let key = APIKeyManager.geminiKey
+        #expect(!key.isEmpty)
+    }
+
+    @Test("GeminiService generates flashcards with flash35Lite")
+    func testGeminiServiceGeneration() async throws {
+        let service = GeminiService(model: .flash35Lite)
+        let prompt = "Generate 2 flashcards translating fruits from English to Polish. STRICT FORMAT: Apple;Jabłko (no header, no markdown)."
+        let result = try await service.generateFlashcards(from: prompt)
+        print("Generated flashcards output:\n\(result)")
+        #expect(!result.isEmpty)
+        #expect(result.contains(";"))
+    }
 }

@@ -112,6 +112,9 @@
 "Custom topic, level & vocabulary prompts" = "Custom topic, level & vocabulary prompts";
 "Instant dual-language deck population" = "Instant dual-language deck population";
 "Unlock FlipIt Pro" = "Unlock FlipIt Pro";
+"[DEBUG] Unlock FlipIt Pro" = "[DEBUG] Unlock FlipIt Pro";
+"Coming Soon" = "Coming Soon";
+"In-app purchases will be available in an upcoming update." = "In-app purchases will be available in an upcoming update.";
 "AI Error" = "AI Error";
 
 // MARK: - Import & Move Cards
@@ -487,6 +490,7 @@
 "Speed & Limit" = "Speed & Limit";
 "Free Daily Limit:" = "Free Daily Limit:";
 "Est. 100 Cards:" = "Est. 100 Cards:";
+"Ultra Fast (~0.9s)" = "Ultra Fast (~0.9s)";
 "Ultra Fast (~1.5s)" = "Ultra Fast (~1.5s)";
 "Fast (~2.5s)" = "Fast (~2.5s)";
 "Balanced (~3.5s)" = "Balanced (~3.5s)";
@@ -494,6 +498,7 @@
 "Pro (~10s)" = "Pro (~10s)";
 "50 req/day (Free Tier)" = "50 req/day (Free Tier)";
 "1,500 req/day (Free Tier)" = "1,500 req/day (Free Tier)";
+"~1.0 – 2.0s" = "~1.0 – 2.0s";
 "~1.5 – 2.5s" = "~1.5 – 2.5s";
 "~2.0 – 3.5s" = "~2.0 – 3.5s";
 "~2.5 – 4.0s" = "~2.5 – 4.0s";
@@ -501,8 +506,8 @@
 "~3.5 – 6.0s" = "~3.5 – 6.0s";
 "~5.0 – 8.0s" = "~5.0 – 8.0s";
 "~8.0 – 15.0s" = "~8.0 – 15.0s";
-"AI 3.1 Flash-Lite (Recommended)" = "AI 3.1 Flash-Lite (Recommended)";
-"AI 3.5 Flash-Lite" = "AI 3.5 Flash-Lite";
+"AI 3.5 Flash-Lite (Recommended)" = "AI 3.5 Flash-Lite (Recommended)";
+"AI 3.1 Flash-Lite" = "AI 3.1 Flash-Lite";
 "AI 3 Flash" = "AI 3 Flash";
 "AI 3.8 Flash" = "AI 3.8 Flash";
 "AI service is temporarily busy. Please try again in a moment." = "AI service is temporarily busy. Please try again in a moment.";

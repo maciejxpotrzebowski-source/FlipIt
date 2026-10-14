@@ -129,13 +129,14 @@ struct AIGenerateView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                         .padding(.horizontal, 24)
 
+#if DEBUG
                         Button(action: {
                             store.settings.isPremiumUser = true
                             store.saveData()
                         }) {
                             HStack {
                                 Image(systemName: "sparkles")
-                                Text("Unlock FlipIt Pro")
+                                Text("[DEBUG] Unlock FlipIt Pro")
                             }
                             .font(.headline)
                             .foregroundStyle(.white)
@@ -146,6 +147,24 @@ struct AIGenerateView: View {
                         }
                         .padding(.horizontal, 24)
                         .padding(.bottom, 24)
+#else
+                        VStack(spacing: 8) {
+                            Text("Coming Soon")
+                                .font(.headline)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.secondary.opacity(0.12))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                            Text("In-app purchases will be available in an upcoming update.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
+#endif
                     }
                 }
                 .background(Color.appGroupedBackground)

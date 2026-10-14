@@ -650,30 +650,32 @@ enum StudySideOption: String, Codable, CaseIterable {
 }
 
 enum GeminiModelOption: String, Codable, CaseIterable, Identifiable {
-    case flash3 = "models/gemini-3-flash-preview"
-    case flash31Lite = "models/gemini-3.1-flash-lite"
     case flash35Lite = "models/gemini-3.5-flash-lite"
+    case flash3 = "models/gemini-3-flash-preview"
     case flash38 = "models/gemini-3.8-flash"
+    case flash31Lite = "models/gemini-3.1-flash-lite"
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
+        case .flash35Lite:
+            return "AI 3.5 Flash-Lite (Recommended)"
         case .flash3:
             return "AI 3 Flash"
-        case .flash31Lite:
-            return "AI 3.1 Flash-Lite (Recommended)"
-        case .flash35Lite:
-            return "AI 3.5 Flash-Lite"
         case .flash38:
             return "AI 3.8 Flash"
+        case .flash31Lite:
+            return "AI 3.1 Flash-Lite"
         }
     }
 
     var speedBadge: String {
         switch self {
-        case .flash31Lite, .flash35Lite:
-            return "Ultra Fast (~1.5s)"
+        case .flash35Lite:
+            return "Ultra Fast (~0.9s)"
+        case .flash31Lite:
+            return "Fast (~1.5s)"
         case .flash3, .flash38:
             return "Fast (~2.5s)"
         }
@@ -685,20 +687,22 @@ enum GeminiModelOption: String, Codable, CaseIterable, Identifiable {
 
     var badgeColor: Color {
         switch self {
+        case .flash35Lite:
+            return .blue
         case .flash3:
             return .purple
-        case .flash31Lite:
-            return .blue
-        case .flash35Lite:
-            return .green
         case .flash38:
             return .orange
+        case .flash31Lite:
+            return .cyan
         }
     }
 
     var estimatedTime100Cards: String {
         switch self {
-        case .flash31Lite, .flash35Lite:
+        case .flash35Lite:
+            return "~1.0 – 2.0s"
+        case .flash31Lite:
             return "~1.5 – 2.5s"
         case .flash3, .flash38:
             return "~2.5 – 4.0s"
@@ -725,7 +729,7 @@ struct AppSettings: Codable {
     var defaultBackLanguage: String = "pl-PL"
     var isPremiumUser: Bool = false
     var analyticsEnabled: Bool = false // Anonimowa telemetria uczenia
-    var geminiModel: GeminiModelOption = .flash31Lite
+    var geminiModel: GeminiModelOption = .flash35Lite
 
     init(
         confirmDelete: Bool = true,
@@ -743,7 +747,7 @@ struct AppSettings: Codable {
         defaultBackLanguage: String = "pl-PL",
         isPremiumUser: Bool = false,
         analyticsEnabled: Bool = false,
-        geminiModel: GeminiModelOption = .flash31Lite
+        geminiModel: GeminiModelOption = .flash35Lite
     ) {
         self.confirmDelete = confirmDelete
         self.sortOption = sortOption
@@ -783,7 +787,7 @@ struct AppSettings: Codable {
            let model = GeminiModelOption(rawValue: raw) {
             geminiModel = model
         } else {
-            geminiModel = .flash31Lite
+            geminiModel = .flash35Lite
         }
     }
 }

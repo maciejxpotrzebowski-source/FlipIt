@@ -17,7 +17,7 @@ class GeminiService {
                   let settings = try? JSONDecoder().decode(AppSettings.self, from: settingsData) {
             self.modelName = settings.geminiModel.rawValue
         } else {
-            self.modelName = GeminiModelOption.flash31Lite.rawValue
+            self.modelName = GeminiModelOption.flash35Lite.rawValue
         }
     }
 
@@ -38,12 +38,12 @@ class GeminiService {
 
             return cleanResponse(text)
         } catch {
-            // Automatyczny fallback do sprawdzonego, superszybkiego Gemini 3.1 Flash-Lite
-            if modelName != GeminiModelOption.flash31Lite.rawValue {
+            // Automatyczny fallback do sprawdzonego, superszybkiego Gemini 3.5 Flash-Lite
+            if modelName != GeminiModelOption.flash35Lite.rawValue {
                 #if DEBUG
-                print("⚠️ Model \(modelName) failed (\(error.localizedDescription)). Retrying with fallback: Gemini 3.1 Flash-Lite...")
+                print("⚠️ Model \(modelName) failed (\(error.localizedDescription)). Retrying with fallback: Gemini 3.5 Flash-Lite...")
                 #endif
-                let fallbackModel = GenerativeModel(name: GeminiModelOption.flash31Lite.rawValue, apiKey: apiKey)
+                let fallbackModel = GenerativeModel(name: GeminiModelOption.flash35Lite.rawValue, apiKey: apiKey)
                 if let fallbackResponse = try? await fallbackModel.generateContent(prompt),
                    let text = fallbackResponse.text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     return cleanResponse(text)
