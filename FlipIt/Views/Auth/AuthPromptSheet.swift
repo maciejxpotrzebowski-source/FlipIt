@@ -81,20 +81,22 @@ struct AuthPromptSheet: View {
                     
                     // MARK: - Auth Buttons
                     VStack(spacing: 12) {
-                        // 1. Sign in with Apple
-                        SignInWithAppleButton(
-                            onRequest: { request in
-                                let nonce = authManager.generateNonce()
-                                request.requestedScopes = [.fullName, .email]
-                                request.nonce = authManager.sha256(nonce)
-                            },
-                            onCompletion: { result in
-                                handleAppleCompletion(result)
-                            }
-                        )
-                        .signInWithAppleButtonStyle(.whiteOutline)
-                        .frame(height: 50)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        // 1. Sign in with Apple (Requires paid Apple Developer account)
+                        if AuthManager.isAppleSignInEnabled {
+                            SignInWithAppleButton(
+                                onRequest: { request in
+                                    let nonce = authManager.generateNonce()
+                                    request.requestedScopes = [.fullName, .email]
+                                    request.nonce = authManager.sha256(nonce)
+                                },
+                                onCompletion: { result in
+                                    handleAppleCompletion(result)
+                                }
+                            )
+                            .signInWithAppleButtonStyle(.whiteOutline)
+                            .frame(height: 50)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
                         
                         // 2. Sign in with Google
                         Button(action: {

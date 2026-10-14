@@ -125,6 +125,10 @@ final class WebAuthPresentationProvider: NSObject, ASWebAuthenticationPresentati
 final class AuthManager: ObservableObject {
     static let shared = AuthManager()
     
+    /// Feature flag: Sign in with Apple requires paid Apple Developer Program capability.
+    /// Set to false on Free Personal Team builds to prevent unsupported capability crashes.
+    static let isAppleSignInEnabled: Bool = false
+    
     @Published var currentUser: User? = nil
     @Published var currentProfile: UserProfile? = nil
     @Published var isLoading: Bool = false
