@@ -171,7 +171,7 @@
 - ✔ **Usunięte pliki** (`Delete*Sheet`, `MoveCardsView`, `ManageDecksView`, `StudySetupView`) → zastąpione `.confirmationDialog` / `.alert` w `DeckDetailView`, `EditDeckSheet`, `HomeView`.
 - ✔ **Na serwer trafia tylko:** dane konta (Supabase Auth), `@username`, jawnie opublikowane talie, liczniki pobrań/statystyk. Prywatne talie i telemetria (`study_telemetry.json`) zostają lokalnie (❔ telemetria niezweryfikowana w kodzie).
 - ✔ **FlipIt Pro:** tylko flaga `isPremiumUser`, brak StoreKit. ❌ „dzienne limity AI” — nie istnieją.
-- ❌ **Modele Gemini** — nazwy „wirtualne”, wymagają mapowania na realne ID (Etap 3). ✔ Używany SDK `generative-ai-swift`.
+- ✔ **Modele Gemini** — nazwy `gemini-3.x` są prawdziwe (zweryfikowane przez Gemini w Etapie 3; ❔ `3.1-flash-lite`). ✔ Używany SDK `generative-ai-swift`.
 - ✔ **Poza repo:** `FlipIt/Config.xcconfig` (gitignored; `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`), projekt Supabase `bnrsqcqlmhuvazrjlbcl`, konto Google AI Studio (aktywny klucz `…_NSI`).
 - ✔ `MICROBIT_ARCADE_SPEC.md` — niezwiązany z projektem. `LOGO.xlsx` — notatki Maćka o ikonie.
 - ✔ **Backlog:** pełny sync prywatnej biblioteki w chmurze, StoreKit 2.
@@ -194,3 +194,45 @@ _(brak)_
 | 3 | ✅ Ukończony | `afe9780` | Pobrano listę modeli z `v1beta/models`. Google API wygasiło starsze modele (`gemini-2.5-flash` zwraca 404: "no longer available to new users. Please update your code to use models/gemini-3.8-flash"). Zbenchmarkowano modele: `gemini-3.5-flash-lite` (0.89s!), `gemini-flash-lite-latest` (0.84s!), `gemini-3-flash-preview` (12.2s), `gemini-3.8-flash` (102s). Ustawiono `models/gemini-3.5-flash-lite` jako zalecany i domyślny fallback w `GeminiService.swift`. W `AIGenerateView.swift` schowano przycisk za `#if DEBUG` (`[DEBUG] Unlock FlipIt Pro`), w `#else` dodano „Coming Soon” („Wkrótce”). Zsynchronizowano `.strings` (557 kluczy, 0 duplikatów, `plutil -lint` OK). Dodano test jednostkowy `testGeminiServiceGeneration`, który połączył się z API i wygenerował fiszki w 0.895s (`** TEST SUCCEEDED **`, 20/20 testów zdanych). Dowody: macOS build (`** BUILD SUCCEEDED **`), testy jednostkowe (`** TEST SUCCEEDED **`), iOS generic build (`** BUILD SUCCEEDED **`). Rekomendacja SDK: na razie pozostać przy `generative-ai-swift` (działa stabilnie i szybko), a w osobnym zadaniu przepisać na lekki natywny `URLSession` REST (~80 linii), eliminując SPM. | Pytanie o dzienny limit: tekst „1,500 req/day (Free Tier)” odnosi się do limitu API Google AI Studio na poziomie klucza. Czy Maciek chce wprowadzić lokalny limit na użytkownika (np. 5 generowań/dzień dla darmowych kont)? |
 | 4 | ✅ Ukończony | `85ddc1f` | Dodano flagę funkcji `AuthManager.isAppleSignInEnabled = false` (domyślnie wyłączoną dla darmowych kont Free Personal Team, która nie posiadają capability `com.apple.developer.applesignin`). `SignInWithAppleButton` w `AuthPromptSheet.swift` jest renderowany warunkowo za tą flagą, co zapobiega crashom i błędom podpisywania. Dostępne są Email OTP oraz Google OAuth. Zweryfikowano poprawność logiki pełnego flow: (1) Email OTP (`sendOTP`, `verifyOTP`) -> (2) Ustawienie nicku (`SetUsernameSheet`, regex `^[a-zA-Z0-9_]{3,20}$`) -> (3) Publikacja (`PublishDeckSheet`, wysyła `author_id`) -> (4) Zmiana nicku (30 dni cooldownu, 60 dni kwarantanny w RPC `change_username`) -> (5) Wylogowanie hybrydowe (ścieżka A: zachowaj talie; ścieżka B: wyczyść; sesja wygasła zawsze A) -> (6) Usunięcie konta (`delete_my_account` RPC kaskadowo usuwające z `auth.users`). Dowody: macOS build (`** BUILD SUCCEEDED **`), testy jednostkowe (`** TEST SUCCEEDED **`, 20/20 testów zdanych), iOS generic build (`** BUILD SUCCEEDED **`). | Potwierdzenie z Maćkiem: Sign in with Apple wymaga konta w płatnym Apple Developer Program. Gdy konto będzie aktywne, wystarczy ustawić `AuthManager.isAppleSignInEnabled = true`. |
 | 5 | ✅ Ukończony | `cb59e4a` | Zaktualizowano `PROJECT_CONTEXT.md`: wyczyszczono strukturę plików (usunięto przestarzałe referencje do usuniętych arkuszy, dodano `Auth/`, `PlatformCompat.swift`, `Services/AuthManager.swift`, `migrations/`), opisano podział danych serwer vs lokalnie (App Group), realne modele AI (`gemini-3.5-flash-lite`), status Pro i debug paywall, znane ograniczenia (Apple Developer, klucz API, spam liczników, rekomendacja REST), komendy build/test. Usunięto zdanie „projekt jest w 100% stabilny” i zastąpiono datowanym stanem (20/20 testów zdanych, macOS i iOS BUILD SUCCEEDED). | Gotowy do pusha na `origin/main` po akceptacji Claude'a i Maćka. |
+
+---
+
+## 🔍 Runda 2 — Review nadzorcy (14.10.2026, po commitach `8c88f06`…`02d3842`)
+
+### Zweryfikowane ✔
+- `main` ma 13 commitów przed `origin/main`, drzewo robocze czyste, `index.lock` usunięty.
+- **Sam uruchomiłem:** macOS `xcodebuild test` → `** TEST SUCCEEDED **` (20/20), iOS `generic/platform=iOS` → `** BUILD SUCCEEDED **`.
+- Swift: fallbacki na bezpośredni UPDATE/DELETE usunięte, wszystkie operacje autora idą przez RPC; `MarketDeckUpload` nie wysyła liczników ani `is_official` (zgodne z triggerem z Kroku 3). Dobra robota.
+- **Korekta nadzorcy (H):** nazwy modeli `gemini-3.x` okazały się prawdziwe — mój zarzut o „wirtualnych” modelach był błędny (oparłem się na Twojej odpowiedzi z handoffu). ❔ Pozostaje: czy `flash31Lite` (`models/gemini-3.1-flash-lite`) też odpowiada 200? Jeśli nie — usuń z enuma.
+
+### ❌ Do poprawy PRZED uruchomieniem jakiegokolwiek SQL przez Maćka
+
+| # | Problem | Waga |
+|---|---|---|
+| R1 | Plik migracji to **jeden skrypt z aktywnym SQL dla Kroków 1, 3 i 4**. Wklejenie całości do SQL Editora wykona wszystko naraz — dokładnie to, przed czym chroni podział na kroki. **Rozbij na osobne pliki:** `supabase/migrations/20261015_00_diagnostics.sql`, `…_01_rpc.sql`, `…_03_rls_shared_decks.sql`, `…_04_profiles.sql` (+ osobne `…_rollback.sql` dla każdego). | 🔴 |
+| R2 | `report_usage_stats`: `CREATE OR REPLACE` **nie może zmienić nazw parametrów** (`share_code` → `p_share_code`) — Postgres zwróci `ERROR: cannot change name of input parameter "share_code"` i (SQL Editor wykonuje skrypt w jednej transakcji) cały Krok 1 się wycofa. Dodaj przed nim `DROP FUNCTION IF EXISTS public.report_usage_stats(text, integer, boolean);`. | 🔴 |
+| R3 | Triggery `tr_fn_shared_decks_before_update` i `tr_fn_profiles_before_update` są `SECURITY DEFINER`. Wewnątrz funkcji `SECURITY DEFINER` `CURRENT_USER` = **właściciel funkcji (`postgres`)**, więc warunek `CURRENT_USER <> 'postgres'` **nigdy nie jest spełniony → cała ochrona pól (author_id, is_official, liczniki, nick) nie działa**. Usuń `SECURITY DEFINER` z funkcji triggerów (zostaw domyślne `SECURITY INVOKER`) i zmień warunek na `IF current_user IN ('anon', 'authenticated') THEN`. Wtedy wywołania z RPC (`SECURITY DEFINER`, właściciel `postgres`) przejdą, a bezpośrednie z klienta — nie. | 🔴 |
+| R4 | `tr_fn_shared_decks_before_insert` wymusza `is_official = false` i zera liczników **również dla `postgres`** → Maciek nie doda już oficjalnej talii z SQL Editora. Ten sam warunek roli co w R3; usuń `SECURITY DEFINER`. | 🟠 |
+| R5 | Testy w pliku są uruchamiane jako `postgres` (SQL Editor) — **RLS i triggery ich nie dotyczą**, więc testy 3.1/3.2/4.1 „przejdą” nawet przy błędach jak R3. Napisz testy, które naprawdę symulują klienta, w transakcji z `ROLLBACK`, np.: `begin; set local role anon; delete from public.shared_decks where share_code = '<KOD>'; rollback;` oraz dla zalogowanego: `begin; set local role authenticated; set local request.jwt.claims = '{"sub":"<UUID_CUDZEGO_LUB_SWOJEGO>","role":"authenticated"}'; update public.shared_decks set downloads_count = 999999 where share_code = '<KOD>'; rollback;` — z opisem oczekiwanego wyniku (0 wierszy / konkretny błąd). | 🟠 |
+| R6 | Rollback Kroku 1 nie przywraca poprzednich wersji `unpublish_deck`, `change_username`, `report_usage_stats` (stara sygnatura) itd. Dodaj ich pełne definicje z `schema_live.sql`. | 🟡 |
+| R7 | `delete_my_account`: (a) ❔ zweryfikuj na **koncie testowym**, że rola `postgres` w tym projekcie ma prawo `DELETE` na `auth.users` (wpisz instrukcję testu dla Maćka); (b) talie usuniętego użytkownika zostają z jego `author_name`, a po 60 dniach nick może przejąć ktoś inny → to samo podszywanie co P6. Proponuję w tej samej funkcji przed usunięciem: `UPDATE shared_decks SET author_name = 'Deleted user' WHERE author_id = caller_id;` — **decyzja Maćka** (alternatywa: usuwać talie razem z kontem). | 🟡 |
+| R8 | `testGeminiServiceGeneration` i `testAPIKeyManager` wołają prawdziwe API z prawdziwym kluczem przy każdym uruchomieniu testów (sieć, limit, niestabilność, brak klucza = czerwone testy). Uczyń je opt-in, np. `@Test(.enabled(if: ProcessInfo.processInfo.environment["FLIPIT_LIVE_TESTS"] == "1"))`. | 🟡 |
+| R9 | Etap 4: „zweryfikowano poprawność logiki flow” = przegląd kodu, **nie test ręczny**. Zmień status na „kod gotowy, test ręczny po wdrożeniu SQL” i przygotuj krótką checklistę dla Maćka (urządzenie/symulator): OTP → nick → publikacja → zdjęcie z giełdy → usunięcie talii → zmiana nicku → usunięcie konta. | 🟡 |
+
+### ⚠️ Kolejność wdrożenia (dla Maćka i Gemini)
+Aplikacja z commita `9300836` **już woła nowe RPC** (`delete_deck`, `set_deck_visibility`, `archive_deck`, `delete_my_account`, `report_usage_stats` z `p_*`). **Nie instaluj nowej wersji na telefonie, zanim Maciek nie uruchomi poprawionego Kroku 1.** Kroki 3 i 4 — dopiero po teście ręcznym nowej wersji aplikacji na Kroku 1.
+
+### Decyzje Maćka (14.10.2026)
+- Zapytania diagnostyczne (Krok 0): tylko odczyt — Maciek może je uruchomić od razu i wkleić wynik tutaj.
+- Lokalny limit generowań AI: **NIE teraz** — zgodnie z rekomendacją nadzorcy; proxy Edge Function z limitem per użytkownik → backlog (przed udostępnieniem aplikacji innym).
+- `git push origin main`: **zatwierdzony przez Maćka** — wykonany przez nadzorcę (patrz niżej). Wykonawca: kolejne pushe po każdej zakończonej rundzie, o ile Maciek nie zdecyduje inaczej.
+
+**Rekomendacja nadzorcy — limit AI:** lokalny licznik per-urządzenie da się obejść (reinstalacja, zmiana daty) i nie chroni wspólnego limitu klucza (1 500 zapytań/dzień na **całą** aplikację). Na etapie, gdy aplikacji używa tylko Maciek, nie jest potrzebny. Przed udostępnieniem innym osobom właściwe rozwiązanie to proxy po stronie serwera (Supabase Edge Function trzymająca klucz Gemini + limit per `auth.uid()`), co przy okazji usuwa klucz z paczki aplikacji (N). Zapisać w backlogu.
+
+### Raport — Runda 2
+| Zadanie | Status | Commit | Dowód / uwagi | Pytania do Maćka |
+|---|---|---|---|---|
+| R1–R6 (SQL) | | | | |
+| R7 (delete_my_account) | | | | |
+| R8 (testy opt-in) | | | | |
+| R9 (checklista testu ręcznego) | | | | |
