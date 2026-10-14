@@ -281,3 +281,34 @@ Następnie zainstaluj najnowszą wersję aplikacji i przetestuj poniższe kroki:
      - Konto zostało skasowane z `auth.users` i `profiles` w Supabase.
      - Ewentualne wcześniej opublikowane talie w Community mają teraz autora `'Deleted user'` i `author_id = NULL`.
 
+
+---
+
+## 🔍 Runda 3 — Review nadzorcy (14.10.2026, commit `ef5a0fb`)
+
+### Zweryfikowane ✔
+- R1: migracja rozbita na osobne pliki + rollbacki ✔
+- R2: `DROP FUNCTION` przed nową sygnaturą `report_usage_stats` ✔
+- R3/R4: funkcje triggerów bez `SECURITY DEFINER`, warunek `current_user IN ('anon','authenticated')` ✔ — poprawnie.
+- R7b: `author_name = 'Deleted user'` przy usuwaniu konta ✔
+- R8: testy live za `FLIPIT_LIVE_TESTS=1` ✔
+- `00_diagnostics.sql` — tylko SELECT, **Maciek może uruchomić** ✔
+
+### ❌ Blokery przed uruchomieniem `01_rpc.sql` i instalacją aplikacji
+
+| # | Problem | Waga |
+|---|---|---|
+| S1 | **Testy są aktywnym SQL w plikach migracji** (`01_rpc.sql` l. 333–345, `03_…` l. 146–167, `04_…` l. 89–94). Test 1.1 **celowo rzuca błąd**. W SQL Editorze cały plik idzie jednym zapytaniem; gdy w takim zapytaniu jest `BEGIN`, wcześniejsze polecenia wchodzą do tej samej transakcji — błąd testu **wycofa całą migrację** (albo, zależnie od trybu edytora, zostawi bazę w niejasnym stanie). Przenieś testy do osobnych plików `…_01_rpc_tests.sql`, `…_03_…_tests.sql`, `…_04_…_tests.sql`, a każdy test opisz jako „uruchom osobno, zaznaczając tylko ten blok”. Pliki migracji mają zawierać **wyłącznie** zmiany schematu. | 🔴 |
+| S2 | **Niezgodność parametru `set_deck_visibility`:** SQL ma `p_is_public`, a `SupabaseManager.swift:317–319` wysyła `is_public`. PostgREST dopasowuje funkcję po nazwach parametrów → `PGRST202 function not found` → zmiana widoczności talii nie zadziała. Zmień Swift na `p_is_public` (nie zmieniaj SQL — zmiana nazwy parametru wymagałaby znowu `DROP FUNCTION`). Przejrzyj **wszystkie** wywołania `rpc(` i potwierdź w raporcie tabelą: funkcja → nazwy parametrów w SQL → nazwy w Swift. | 🔴 |
+| S3 | `archive_deck` zmienił znaczenie: wcześniej `markDeckAsArchived` dodawał tag `"archived"`, teraz RPC ustawia `is_public = false` i **nie dodaje tagu**. `FlipItModels.swift:622` nadal sprawdza `tags.contains("archived")` — ta logika przestanie działać. Albo przywróć dodawanie tagu w RPC (`tags = array_append(array_remove(tags, 'archived'), 'archived')`, ewentualnie razem z `is_public = false`), albo usuń/zmień logikę po stronie Swift — **opisz w raporcie, który wariant i dlaczego**. | 🟠 |
+| S4 | `report_usage_stats` — zniknęło sprawdzenie zakresu `p_reviews_count` (0…1000) z poprzedniej wersji; bez niego każdy może jednym wywołaniem dodać np. 2 mld powtórek. Przywróć. | 🟡 |
+
+**Po poprawkach:** zbuduj macOS + iOS, uruchom testy, commit, push, wpis w tabeli niżej. Dopiero wtedy Maciek uruchamia `01_rpc.sql` i instaluje aplikację.
+
+### Raport — Runda 3
+| Zadanie | Status | Commit | Dowód / uwagi | Pytania do Maćka |
+|---|---|---|---|---|
+| S1 (testy poza migracjami) | | | | |
+| S2 (parametry RPC — tabela zgodności) | | | | |
+| S3 (archive_deck) | | | | |
+| S4 (limit report_usage_stats) | | | | |
