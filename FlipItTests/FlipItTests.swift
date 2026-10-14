@@ -556,13 +556,15 @@ struct FlipItTests {
         #expect(newHorse.isLearned == false)
     }
 
-    @Test("APIKeyManager returns non-empty geminiKey")
+    @Test("APIKeyManager returns non-empty geminiKey",
+          .enabled(if: ProcessInfo.processInfo.environment["FLIPIT_LIVE_TESTS"] == "1"))
     func testAPIKeyManager() {
         let key = APIKeyManager.geminiKey
         #expect(!key.isEmpty)
     }
 
-    @Test("GeminiService generates flashcards with flash35Lite")
+    @Test("GeminiService generates flashcards with flash35Lite",
+          .enabled(if: ProcessInfo.processInfo.environment["FLIPIT_LIVE_TESTS"] == "1"))
     func testGeminiServiceGeneration() async throws {
         let service = GeminiService(model: .flash35Lite)
         let prompt = "Generate 2 flashcards translating fruits from English to Polish. STRICT FORMAT: Apple;Jabłko (no header, no markdown)."

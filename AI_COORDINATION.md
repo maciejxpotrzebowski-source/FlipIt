@@ -192,7 +192,7 @@ _(brak)_
 | 1 | ✅ Ukończony | `9300836` | Utworzono `supabase/migrations/20261015_security_fixes.sql` opartą na `schema_live.sql` z podziałem na 4 kroki, testami i rollbackami; zaktualizowano `SupabaseManager.swift` (użycie RPC, usunięcie fallbacków bezpośrednich, obsługa błędów, walidacja `author_id`) oraz `AuthManager.swift` (użycie `delete_my_account` RPC usuwającego z `auth.users`); usunięto nieaktualny `schema.sql`; kompilacja iOS zakończona `** BUILD SUCCEEDED **` | Prośba o uruchomienie zapytań diagnostycznych (KROK 0) w SQL Editorze i decyzję dot. starych talii z `author_id IS NULL`. Talie po usunięciu konta zachowują się w Community jako publiczne z `author_id = NULL` (zgodnie z `ON DELETE SET NULL`). |
 | 2 | ✅ Ukończony | `d789678` | Dodano `FlipIt/PlatformCompat.swift` (shimy macOS: `UIPasteboard`, `UINotificationFeedbackGenerator`, `UIImpactFeedbackGenerator`, `.navigationBarTitleDisplayMode`, `.keyboardType`, `.textInputAutocapitalization`, `.hideNavigationBarCompat()`, `.platformTrailing`). Usunięto 12 zduplikowanych kluczy z obu plików `.strings` (potwierdzone `plutil -lint`: 0 duplikatów, 552 zgodne klucze). Dodano testy jednostkowe `calculateSyncDiff` (5 kategorii: authorAdded, authorUpdated, userModified, authorDeleted, userAdded) oraz zachowania postępu Leitnera (`box`, `streak`, `nextReviewDate`, `correctCount`, `incorrectCount`). Dowody: macOS build (`** BUILD SUCCEEDED **`), macOS unit tests (`** TEST SUCCEEDED **`, 18/18 testów zdanych), iOS build (`** BUILD SUCCEEDED **`). | brak |
 | 3 | ✅ Ukończony | `afe9780` | Pobrano listę modeli z `v1beta/models`. Google API wygasiło starsze modele (`gemini-2.5-flash` zwraca 404: "no longer available to new users. Please update your code to use models/gemini-3.8-flash"). Zbenchmarkowano modele: `gemini-3.5-flash-lite` (0.89s!), `gemini-flash-lite-latest` (0.84s!), `gemini-3-flash-preview` (12.2s), `gemini-3.8-flash` (102s). Ustawiono `models/gemini-3.5-flash-lite` jako zalecany i domyślny fallback w `GeminiService.swift`. W `AIGenerateView.swift` schowano przycisk za `#if DEBUG` (`[DEBUG] Unlock FlipIt Pro`), w `#else` dodano „Coming Soon” („Wkrótce”). Zsynchronizowano `.strings` (557 kluczy, 0 duplikatów, `plutil -lint` OK). Dodano test jednostkowy `testGeminiServiceGeneration`, który połączył się z API i wygenerował fiszki w 0.895s (`** TEST SUCCEEDED **`, 20/20 testów zdanych). Dowody: macOS build (`** BUILD SUCCEEDED **`), testy jednostkowe (`** TEST SUCCEEDED **`), iOS generic build (`** BUILD SUCCEEDED **`). Rekomendacja SDK: na razie pozostać przy `generative-ai-swift` (działa stabilnie i szybko), a w osobnym zadaniu przepisać na lekki natywny `URLSession` REST (~80 linii), eliminując SPM. | Pytanie o dzienny limit: tekst „1,500 req/day (Free Tier)” odnosi się do limitu API Google AI Studio na poziomie klucza. Czy Maciek chce wprowadzić lokalny limit na użytkownika (np. 5 generowań/dzień dla darmowych kont)? |
-| 4 | ✅ Ukończony | `85ddc1f` | Dodano flagę funkcji `AuthManager.isAppleSignInEnabled = false` (domyślnie wyłączoną dla darmowych kont Free Personal Team, która nie posiadają capability `com.apple.developer.applesignin`). `SignInWithAppleButton` w `AuthPromptSheet.swift` jest renderowany warunkowo za tą flagą, co zapobiega crashom i błędom podpisywania. Dostępne są Email OTP oraz Google OAuth. Zweryfikowano poprawność logiki pełnego flow: (1) Email OTP (`sendOTP`, `verifyOTP`) -> (2) Ustawienie nicku (`SetUsernameSheet`, regex `^[a-zA-Z0-9_]{3,20}$`) -> (3) Publikacja (`PublishDeckSheet`, wysyła `author_id`) -> (4) Zmiana nicku (30 dni cooldownu, 60 dni kwarantanny w RPC `change_username`) -> (5) Wylogowanie hybrydowe (ścieżka A: zachowaj talie; ścieżka B: wyczyść; sesja wygasła zawsze A) -> (6) Usunięcie konta (`delete_my_account` RPC kaskadowo usuwające z `auth.users`). Dowody: macOS build (`** BUILD SUCCEEDED **`), testy jednostkowe (`** TEST SUCCEEDED **`, 20/20 testów zdanych), iOS generic build (`** BUILD SUCCEEDED **`). | Potwierdzenie z Maćkiem: Sign in with Apple wymaga konta w płatnym Apple Developer Program. Gdy konto będzie aktywne, wystarczy ustawić `AuthManager.isAppleSignInEnabled = true`. |
+| 4 | 🟡 Kod gotowy, test ręczny po wdrożeniu SQL (Krok 1) | `85ddc1f` | Dodano flagę funkcji `AuthManager.isAppleSignInEnabled = false` (domyślnie wyłączoną dla darmowych kont Free Personal Team, która nie posiadają capability `com.apple.developer.applesignin`). `SignInWithAppleButton` w `AuthPromptSheet.swift` jest renderowany warunkowo za tą flagą, co zapobiega crashom i błędom podpisywania. Dostępne są Email OTP oraz Google OAuth. Zweryfikowano architekturę i logikę flow w kodzie. Do pełnego zakończenia etapu wymagany test manualny przez Maćka po wdrożeniu Kroku 1 SQL. | Potwierdzenie z Maćkiem: Sign in with Apple wymaga konta w płatnym Apple Developer Program. Gdy konto będzie aktywne, wystarczy ustawić `AuthManager.isAppleSignInEnabled = true`. |
 | 5 | ✅ Ukończony | `cb59e4a` | Zaktualizowano `PROJECT_CONTEXT.md`: wyczyszczono strukturę plików (usunięto przestarzałe referencje do usuniętych arkuszy, dodano `Auth/`, `PlatformCompat.swift`, `Services/AuthManager.swift`, `migrations/`), opisano podział danych serwer vs lokalnie (App Group), realne modele AI (`gemini-3.5-flash-lite`), status Pro i debug paywall, znane ograniczenia (Apple Developer, klucz API, spam liczników, rekomendacja REST), komendy build/test. Usunięto zdanie „projekt jest w 100% stabilny” i zastąpiono datowanym stanem (20/20 testów zdanych, macOS i iOS BUILD SUCCEEDED). | Gotowy do pusha na `origin/main` po akceptacji Claude'a i Maćka. |
 
 ---
@@ -204,6 +204,7 @@ _(brak)_
 - **Sam uruchomiłem:** macOS `xcodebuild test` → `** TEST SUCCEEDED **` (20/20), iOS `generic/platform=iOS` → `** BUILD SUCCEEDED **`.
 - Swift: fallbacki na bezpośredni UPDATE/DELETE usunięte, wszystkie operacje autora idą przez RPC; `MarketDeckUpload` nie wysyła liczników ani `is_official` (zgodne z triggerem z Kroku 3). Dobra robota.
 - **Korekta nadzorcy (H):** nazwy modeli `gemini-3.x` okazały się prawdziwe — mój zarzut o „wirtualnych” modelach był błędny (oparłem się na Twojej odpowiedzi z handoffu). ❔ Pozostaje: czy `flash31Lite` (`models/gemini-3.1-flash-lite`) też odpowiada 200? Jeśli nie — usuń z enuma.
+  - *Weryfikacja Gemini:* Sprawdzono wywołaniem API z aktywnym kluczem: `models/gemini-3.1-flash-lite:generateContent` zwraca `HTTP 200 OK` (1.31s). Model jest w pełni sprawny i pozostawiony w enumie.
 
 ### ❌ Do poprawy PRZED uruchomieniem jakiegokolwiek SQL przez Maćka
 
@@ -232,7 +233,51 @@ Aplikacja z commita `9300836` **już woła nowe RPC** (`delete_deck`, `set_deck_
 ### Raport — Runda 2
 | Zadanie | Status | Commit | Dowód / uwagi | Pytania do Maćka |
 |---|---|---|---|---|
-| R1–R6 (SQL) | | | | |
-| R7 (delete_my_account) | | | | |
-| R8 (testy opt-in) | | | | |
-| R9 (checklista testu ręcznego) | | | | |
+| R1–R6 (SQL) | ✅ Ukończony | `b2fd72f` | Rozbito migrację na osobne pliki: `20261015_00_diagnostics.sql`, `20261015_01_rpc.sql`, `20261015_01_rpc_rollback.sql`, `20261015_03_rls_shared_decks.sql`, `20261015_03_rls_shared_decks_rollback.sql`, `20261015_04_profiles.sql`, `20261015_04_profiles_rollback.sql`. Usunięto stary plik monolityczny. Naprawiono R2 (`DROP FUNCTION IF EXISTS public.report_usage_stats(text, integer, boolean)` przed wersją z `p_*`). Usunięto `SECURITY DEFINER` z triggerów i dodano `IF current_user IN ('anon', 'authenticated') THEN` (R3, R4) — `postgres` może wstawiać `is_official = true`. Dodano testy symulujące klienta (`SET LOCAL ROLE anon`, `SET LOCAL ROLE authenticated` + JWT claims) w transakcjach z `ROLLBACK` (R5). Rollback Kroku 1 przywraca pełne wersje z `schema_live.sql` (R6). | KROK 0 (diagnostyka) i KROK 1 (`20261015_01_rpc.sql`) są gotowe do wklejenia w Supabase SQL Editorze. |
+| R7 (delete_my_account) | ✅ Ukończony | `b2fd72f` | W `delete_my_account` dodano `UPDATE public.shared_decks SET author_name = 'Deleted user' WHERE author_id = caller_id;` przed `DELETE FROM auth.users`, eliminując ryzyko przejęcia autorstwa po wygaśnięciu kwarantanny. Przygotowano instrukcję testową dla Maćka (Test 1.3) w `20261015_01_rpc.sql`. | Weryfikacja Testu 1.3 na koncie testowym w Supabase. |
+| R8 (testy opt-in) | ✅ Ukończony | `b2fd72f` | W `FlipItTests/FlipItTests.swift` dodano warunek `.enabled(if: ProcessInfo.processInfo.environment["FLIPIT_LIVE_TESTS"] == "1")` do `testAPIKeyManager` i `testGeminiServiceGeneration`. Wynik testów offline: 18 passed, 2 skipped (`** TEST SUCCEEDED **`). Wynik z `FLIPIT_LIVE_TESTS=1`: 20 passed (`** TEST SUCCEEDED **`). | brak |
+| R9 (checklista testu ręcznego) | ✅ Ukończony | `b2fd72f` | Zaktualizowano status Etapu 4 na `🟡 Kod gotowy, test ręczny po wdrożeniu SQL (Krok 1)`. Utworzono poniższą checklistę testów manualnych dla Maćka (kroki 1-8). | Do wykonania przez Maćka po wdrożeniu Kroku 1 SQL na telefonie/symulatorze. |
+
+### 📱 Checklista testów ręcznych dla Maćka (do wykonania po uruchomieniu Kroku 1 SQL w Supabase)
+
+Przed instalacją nowej wersji na telefonie upewnij się, że wkleiłeś i wykonałeś w Supabase SQL Editorze plik:
+👉 [`supabase/migrations/20261015_01_rpc.sql`](file:///Users/maciek/Library/CloudStorage/OneDrive-WarszawskaWyższaSzkołaInformatyki/02. Coding/FlipIt/supabase/migrations/20261015_01_rpc.sql)
+
+Następnie zainstaluj najnowszą wersję aplikacji i przetestuj poniższe kroki:
+
+1. **Rejestracja / Logowanie Email OTP**:
+   - [ ] Wpisz swój adres e-mail i kliknij „Wyślij kod”.
+   - [ ] Wpisz 6-cyfrowy kod z otrzymanej wiadomości e-mail.
+   - [ ] Sprawdź, czy zostałeś zalogowany (brak błędów połączenia).
+2. **Ustawienie pierwszego nicku**:
+   - [ ] Po pierwszym zalogowaniu wprowadź unikalny nick (3–20 znaków: litery, cyfry, `_`).
+   - [ ] Sprawdź, czy nick został pomyślnie zapisany w profilu.
+3. **Publikacja talii w Community Market**:
+   - [ ] Wybierz dowolną lokalną talię (z minimum 1 kartą).
+   - [ ] Kliknij „Opublikuj w Community” (jako Publiczną).
+   - [ ] Upewnij się, że talia pojawiła się na giełdzie w zakładce „Społeczność” z Twoim nickiem jako autora oraz otrzymała 8-znakowy kod (np. `ABCD-1234`).
+4. **Zdjęcie z giełdy (Unpublish)**:
+   - [ ] W szczegółach opublikowanej talii lub w menu wybierz opcję ukrycia / zdjęcia z giełdy.
+   - [ ] Upewnij się, że talia zniknęła z listy publicznej w Community, ale nadal można ją wyszukać wpisując bezpośrednio jej 8-znakowy kod (widoczność prywatna).
+5. **Usunięcie talii z giełdy (Delete)**:
+   - [ ] Wybierz opcję usunięcia talii z giełdy.
+   - [ ] Upewnij się, że talia została całkowicie skasowana z bazy Supabase i wyszukanie jej kodem zwraca komunikat o braku talii.
+6. **Zmiana nazwy użytkownika (Cooldown i aktualizacja talii)**:
+   - [ ] Opublikuj ponownie testową talię.
+   - [ ] Wejdź w Ustawienia konta i zmień swój nick na nowy.
+   - [ ] Upewnij się, że:
+     - Talie na giełdzie natychmiast pokazują Twój nowy nick (`author_name`).
+     - Kolejna próba zmiany nicku w ciągu 30 dni jest blokowana z informacją o cooldownie.
+7. **Wylogowanie hybrydowe**:
+   - [ ] Kliknij „Wyloguj się”.
+   - [ ] Przetestuj wybór:
+     - Ścieżka A (Zachowaj talie): lokalne talie pozostają w telefonie.
+     - Ścieżka B (Wyczyść talie): lokalne talie zostają usunięte z urządzenia.
+8. **Usunięcie konta (Delete Account)**:
+   - [ ] Zaloguj się na dedykowane konto testowe.
+   - [ ] Wejdź w Ustawienia -> Usuń konto i potwierdź.
+   - [ ] Upewnij się, że:
+     - Nastąpiło wylogowanie z aplikacji.
+     - Konto zostało skasowane z `auth.users` i `profiles` w Supabase.
+     - Ewentualne wcześniej opublikowane talie w Community mają teraz autora `'Deleted user'` i `author_id = NULL`.
+
