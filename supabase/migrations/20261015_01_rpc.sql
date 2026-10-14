@@ -84,7 +84,7 @@ BEGIN
 END;
 $$;
 
--- 1.4. RPC archive_deck: Oznaczenie talii jako zarchiwizowanej
+-- 1.4. RPC archive_deck: Oznaczenie talii jako zarchiwizowanej (ustawia is_public = false oraz dodaje tag 'archived' - S3)
 CREATE OR REPLACE FUNCTION public.archive_deck(target_code text)
 RETURNS void
 LANGUAGE plpgsql
@@ -101,6 +101,7 @@ BEGIN
 
     UPDATE public.shared_decks
     SET is_public = false,
+        tags = array_append(array_remove(COALESCE(tags, '{}'::text[]), 'archived'), 'archived'),
         updated_at = NOW()
     WHERE share_code = clean_code
       AND author_id = caller_id;
@@ -111,7 +112,7 @@ BEGIN
 END;
 $$;
 
--- 1.5. RPC report_usage_stats: Poprawienie błędu niejednoznaczności kolumny (P5)
+-- 1.5. RPC report_usage_stats: Poprawienie błędu niejednoznaczności kolumny (P5) i limit 0..1000 (S4)
 -- UWAGA: Przed CREATE OR REPLACE musimy wykonać DROP FUNCTION, ponieważ Postgres
 -- nie pozwala na zmianę nazw parametrów (share_code -> p_share_code) w CREATE OR REPLACE (R2).
 DROP FUNCTION IF EXISTS public.report_usage_stats(text, integer);
@@ -130,6 +131,11 @@ AS $$
 DECLARE
     clean_code TEXT := upper(trim(replace(replace(p_share_code, '-', ''), ' ', '')));
 BEGIN
+    -- Ochrona przed spamowaniem / manipulacją licznikiem powtórek (S4): dozwolony zakres 0..1000
+    IF p_reviews_count < 0 OR p_reviews_count > 1000 THEN
+        RAISE EXCEPTION 'reviews_count poza dozwolonym zakresem (0-1000).';
+    END IF;
+
     UPDATE public.shared_decks
     SET total_reviews_reported = total_reviews_reported + p_reviews_count,
         total_users_reported = total_users_reported + 1,
@@ -325,35 +331,3 @@ $$;
 
 -- 1.12. Usunięcie zbędnego duplikatu indeksu (istnieje już shared_decks_share_code_key)
 DROP INDEX IF EXISTS public.idx_shared_decks_code;
-
--- ==============================================================================
--- TESTY WERYFIKACYJNE DLA KROKU 1 (Symulacja ról klienta w transakcji z ROLLBACK)
--- ==============================================================================
-
--- Test 1.1: Próba wywołania delete_deck jako anonim (musi rzucić wyjątek):
-BEGIN;
-SET LOCAL ROLE anon;
-SELECT public.delete_deck('TESTCODE');
--- Oczekiwany wynik: ERROR: Musisz być zalogowany, aby usunąć talię.
-ROLLBACK;
-
--- Test 1.2: Wywołanie report_usage_stats jako anonim (nie może rzucić błędu niejednoznaczności kolumny):
-BEGIN;
-SET LOCAL ROLE anon;
-SELECT public.report_usage_stats('NIEISTNIEJE', 5, false);
--- Oczekiwany wynik: Sukces (funkcja zwraca void, 0 wierszy zmodyfikowanych, brak błędu ambiguity).
-ROLLBACK;
-
--- Test 1.3: Weryfikacja uprawnień DELETE na auth.users dla delete_my_account (R7a):
--- Instrukcja dla Maćka:
--- 1. Załóż konto testowe w aplikacji lub w Supabase Auth (np. test-delete@example.com).
--- 2. Sprawdź jego UUID: SELECT id FROM auth.users WHERE email = 'test-delete@example.com';
--- 3. Uruchom poniższy blok podstawiając uzyskany UUID:
-/*
-BEGIN;
-SET LOCAL ROLE authenticated;
-SET LOCAL request.jwt.claims = '{"sub":"<TUTAJ_UUID_TESTOWEGO_KONTA>","role":"authenticated"}';
-SELECT public.delete_my_account();
--- Jeśli zwróci {"success": true}, konto zostało pomyślnie usunięte.
-ROLLBACK; -- Zmień na COMMIT, jeśli faktycznie chcesz usunąć konto testowe.
-*/

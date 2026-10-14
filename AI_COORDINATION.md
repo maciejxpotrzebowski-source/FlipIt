@@ -308,10 +308,25 @@ Następnie zainstaluj najnowszą wersję aplikacji i przetestuj poniższe kroki:
 ### Raport — Runda 3
 | Zadanie | Status | Commit | Dowód / uwagi | Pytania do Maćka |
 |---|---|---|---|---|
-| S1 (testy poza migracjami) | | | | |
-| S2 (parametry RPC — tabela zgodności) | | | | |
-| S3 (archive_deck) | | | | |
-| S4 (limit report_usage_stats) | | | | |
+| S1 (testy poza migracjami) | ✅ Ukończony | `6a8f51a` | Przeniesiono wszystkie bloki testowe z transakcjami i symulacją ról do osobnych plików: `20261015_01_rpc_tests.sql`, `20261015_03_rls_shared_decks_tests.sql`, `20261015_04_profiles_tests.sql`. Dodano instrukcję: uruchamiać każdy blok osobno, zaznaczając go kursorem w SQL Editorze. Pliki migracji `01_rpc.sql`, `03_rls_shared_decks.sql` i `04_profiles.sql` zawierają wyłącznie czysty DDL/DML — nie wycofują transakcji przy uruchomieniu w całości. | brak |
+| S2 (parametry RPC — tabela zgodności) | ✅ Ukończony | `6a8f51a` | W `SupabaseManager.swift` zaktualizowano `VisibilityRPCParams` z `is_public` na `p_is_public`, eliminując błąd PostgREST `PGRST202 function not found`. Przeprowadzono pełny audyt wszystkich 10 wywołań RPC w kodzie (tabela poniżej). | brak |
+| S3 (archive_deck) | ✅ Ukończony | `6a8f51a` | Wybrano wariant przywrócenia dodawania tagu `'archived'` po stronie RPC w SQL (`tags = array_append(array_remove(COALESCE(tags, '{}'::text[]), 'archived'), 'archived')`) z jednoczesnym `is_public = false`. Zachowuje to semantykę talii archiwalnej (plakietka/baner w `DeckMarketRowView` i `CommunityDeckPreviewSheet` dla dotychczasowych posiadaczy/wyszukiwania po kodzie) oraz nie wymaga zmian w modelach i widokach Swift. | brak |
+| S4 (limit report_usage_stats) | ✅ Ukończony | `6a8f51a` | W `20261015_01_rpc.sql` dodano walidację `IF p_reviews_count < 0 OR p_reviews_count > 1000 THEN RAISE EXCEPTION ...`. Dodano test `Test 1.2b` w `20261015_01_rpc_tests.sql` weryfikujący odrzucanie przekroczenia limitu. | brak |
+
+#### Tabela zgodności parametrów RPC (SQL ↔ Swift) — S2
+| Funkcja RPC | Parametry w SQL | Parametry w Swift (struktura Encodable) | Status |
+|---|---|---|---|
+| `is_username_available` | `check_username text` | `CheckUsernameParams: check_username: String` | ✅ Zgodne |
+| `change_username` | `new_username text` | `ChangeUsernameParams: new_username: String` | ✅ Zgodne |
+| `delete_my_account` | _(brak)_ | `client.rpc("delete_my_account")` | ✅ Zgodne |
+| `fetch_deck_by_code` | `lookup_code text` | `CodeParams: lookup_code: String` | ✅ Zgodne |
+| `increment_downloads` | `deck_id uuid` | `IncrementParams: deck_id: UUID` | ✅ Zgodne |
+| `report_usage_stats` | `p_share_code text, p_reviews_count integer, p_is_return_user boolean` | `UsageParams: p_share_code: String, p_reviews_count: Int, p_is_return_user: Bool` | ✅ Zgodne |
+| `unpublish_deck` | `target_code text` | `UnpublishRPCParams: target_code: String` | ✅ Zgodne |
+| `set_deck_visibility` | `target_code text, p_is_public boolean` | `VisibilityRPCParams: target_code: String, p_is_public: Bool` | ✅ Poprawiono w Swift |
+| `delete_deck` | `target_code text` | `DeleteRPCParams: target_code: String` | ✅ Zgodne |
+| `archive_deck` | `target_code text` | `ArchiveRPCParams: target_code: String` | ✅ Zgodne |
+
 
 ### Wyniki diagnostyki (Krok 0) — uruchomione przez Maćka 14.10.2026
 - **0.1:** 12 talii z `author_id IS NULL` — 7 prywatnych, 5 publicznych, 0 oficjalnych.

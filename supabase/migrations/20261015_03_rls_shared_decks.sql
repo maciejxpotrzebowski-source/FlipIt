@@ -138,30 +138,3 @@ ALTER TABLE public.shared_decks
     DROP CONSTRAINT IF EXISTS check_cards_payload_size,
     ADD CONSTRAINT check_cards_payload_size CHECK (octet_length(cards_payload::text) <= 1048576);
 
--- ==============================================================================
--- TESTY WERYFIKACYJNE DLA KROKU 3 (Symulacja ról w transakcji z ROLLBACK — R5)
--- ==============================================================================
-
--- Test 3.1: Bezpośredni DELETE jako anonim (musi usunąć 0 wierszy dzięki RLS):
-BEGIN;
-SET LOCAL ROLE anon;
-DELETE FROM public.shared_decks WHERE share_code = 'TESTCODE';
--- Oczekiwany wynik: 0 rows affected (RLS blokuje dostęp anonimom do usuwania).
-ROLLBACK;
-
--- Test 3.2: Bezpośrednia próba sfałszowania downloads_count przez klienta:
-BEGIN;
-SET LOCAL ROLE authenticated;
-SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
-UPDATE public.shared_decks SET downloads_count = 999999 WHERE share_code = 'TESTCODE';
--- Oczekiwany wynik: ERROR: Licznik pobrań może być modyfikowany wyłącznie przez funkcję increment_downloads (lub 0 rows jeśli talia nie należy do sub).
-ROLLBACK;
-
--- Test 3.3: Próba wstawienia talii z cudzym author_id przez klienta:
-BEGIN;
-SET LOCAL ROLE authenticated;
-SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
-INSERT INTO public.shared_decks (title, cards_payload, author_id)
-VALUES ('Fałszywa talia', '[]'::jsonb, '99999999-9999-9999-9999-999999999999');
--- Oczekiwany wynik: ERROR: new row violates row-level security policy for table "shared_decks".
-ROLLBACK;

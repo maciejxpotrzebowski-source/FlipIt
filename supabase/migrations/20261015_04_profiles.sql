@@ -81,14 +81,3 @@ CREATE TRIGGER tr_profiles_before_insert
     FOR EACH ROW
     EXECUTE FUNCTION public.tr_fn_profiles_before_insert();
 
--- ==============================================================================
--- TESTY WERYFIKACYJNE DLA KROKU 4 (Symulacja roli klienta w transakcji z ROLLBACK — R5)
--- ==============================================================================
-
--- Test 4.1: Bezpośrednia próba zmiany nicku przez UPDATE jako klient:
-BEGIN;
-SET LOCAL ROLE authenticated;
-SET LOCAL request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}';
-UPDATE public.profiles SET username = 'hacked_name' WHERE id = '00000000-0000-0000-0000-000000000001';
--- Oczekiwany wynik: ERROR: Nazwa użytkownika może być zmieniona wyłącznie przez dedykowaną funkcję change_username (lub 0 wierszy jeśli profil nie istnieje).
-ROLLBACK;

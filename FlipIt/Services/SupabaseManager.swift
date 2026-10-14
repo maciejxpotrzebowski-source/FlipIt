@@ -314,9 +314,9 @@ class SupabaseManager {
         let sanitizedCode = shareCode.normalizedShareCode
         struct VisibilityRPCParams: Encodable {
             let target_code: String
-            let is_public: Bool
+            let p_is_public: Bool
         }
-        try await client.rpc("set_deck_visibility", params: VisibilityRPCParams(target_code: sanitizedCode, is_public: isPublic)).execute()
+        try await client.rpc("set_deck_visibility", params: VisibilityRPCParams(target_code: sanitizedCode, p_is_public: isPublic)).execute()
     }
     
     func deleteFromMarket(shareCode: String) async throws {
